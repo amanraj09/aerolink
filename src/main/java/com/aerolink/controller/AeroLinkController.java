@@ -1,5 +1,7 @@
 package com.aerolink.controller;
 
+import com.aerolink.model.error.ErrorCode;
+import com.aerolink.model.error.ErrorResponse;
 import com.aerolink.model.response.AirportDetail;
 import com.aerolink.service.AeroLinkService;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +21,8 @@ import java.util.List;
 @RequestMapping("/api/v1")
 public class AeroLinkController {
 
+    private static final int MAX_ICAO_CODES = 15;
+
     private final AeroLinkService aeroLinkService;
 
     public AeroLinkController(AeroLinkService aeroLinkService) {
@@ -27,17 +31,24 @@ public class AeroLinkController {
 
     /**
      * Retrieves airport details for one or more ICAO codes.
+     * Maximum of 15 ICAO codes allowed per request.
      *
-     * @param icaoCodes list of 4-letter ICAO airport identifiers
-     * @return list of {@link AirportDetail} objects
-     *
+     * @param icaoCodes list of 4-letter ICAO airport identifiers (max 15)
+     * @return 200 with list of {@link AirportDetail}, or 400 if more than 15 codes supplied
      */
     @GetMapping("/airport")
-    public ResponseEntity<List<AirportDetail>> getAirportDetails(
-            @RequestParam List<String> icaoCodes) {
-        log.info("Client Requesting airport details for ICAO Codes : {}", icaoCodes);
+    public ResponseEntity<?> getAirportDetails(@RequestParam List<String> icaoCodes) {
+        log.info("Received request for {} ICAO code(s): {}", icaoCodes.size(), icaoCodes);
+
+        if (icaoCodes.size() > MAX_ICAO_CODES) {
+            log.error("Request rejected — {} ICAO codes exceeds limit of {}", icaoCodes.size(), MAX_ICAO_CODES);
+            return ResponseEntity.badRequest()
+                    .body(ErrorResponse.of(ErrorCode.ICAO_LIMIT_EXCEEDED,
+                            "Maximum allowed is " + MAX_ICAO_CODES + ", but received " + icaoCodes.size()));
+        }
+
         List<AirportDetail> airportDetails = aeroLinkService.getAirportDetails(icaoCodes);
-        log.info("Airport details for ICAO Codes : {} successfully returned", icaoCodes);
+        log.info("Successfully returned airport details for {} ICAO code(s)", icaoCodes.size());
         return ResponseEntity.ok(airportDetails);
     }
 }

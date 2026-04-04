@@ -2,20 +2,27 @@ package com.aerolink.client.aviationweather;
 
 import com.aerolink.client.AviationDataProvider;
 import com.aerolink.client.model.AviationWeatherRawResponse;
+import com.aerolink.constant.AeroLinkConstants;
+import com.aerolink.model.error.ErrorCode;
+import com.aerolink.model.error.ErrorResponse;
 import com.aerolink.model.response.AirportCommunications;
 import com.aerolink.model.response.AirportDetail;
 import com.aerolink.model.response.AirportIdentifier;
 import com.aerolink.model.response.AirportLocation;
 import com.aerolink.model.response.AirportOperations;
 import com.aerolink.model.response.RunwayDetail;
+import io.github.bucket4j.Bucket;
+import io.github.bucket4j.ConsumptionProbe;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-import java.util.Objects;
 
 /**
  * RestClient-based implementation of {@link AviationDataProvider} for public Aviation Weather API.
@@ -24,12 +31,17 @@ import java.util.Objects;
 @Component
 public class AviationWeatherClient implements AviationDataProvider {
 
-    private static final String AIRPORT_PATH = "/airport";
+    private final String AIRPORT_PATH = "/airport";
+    private final long NANOS_PER_SECOND = 1_000_000_000L;
+
 
     private final RestClient restClient;
+    private final Bucket rateLimiterBucket;
 
-    public AviationWeatherClient(RestClient aviationWeatherRestClient) {
+    public AviationWeatherClient(RestClient aviationWeatherRestClient,
+                                 @Qualifier(AeroLinkConstants.AVIATION_WEATHER_CLIENT_RATE_LIMITER) Bucket rateLimiterBucket) {
         this.restClient = aviationWeatherRestClient;
+        this.rateLimiterBucket = rateLimiterBucket;
     }
 
     /**
@@ -41,6 +53,15 @@ public class AviationWeatherClient implements AviationDataProvider {
     @Override
     public List<AirportDetail> fetchAirportsByIcaoCodes(List<String> icaoCodes) {
         String ids = String.join(",", icaoCodes);
+
+        ConsumptionProbe probe = rateLimiterBucket.tryConsumeAndReturnRemaining(1);
+        if (!probe.isConsumed()) {
+            long retryAfterSeconds = probe.getNanosToWaitForRefill() / NANOS_PER_SECOND;
+            log.warn("Aviation weather api limit reached. Retry after {}s", retryAfterSeconds);
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    ErrorResponse.of(ErrorCode.RATE_LIMIT_EXCEEDED).message());
+        }
+
         log.info("Calling Aviation Weather API for IDs: {}", ids);
 
         List<AviationWeatherRawResponse> rawResponses = restClient.get()

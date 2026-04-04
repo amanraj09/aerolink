@@ -13,7 +13,7 @@
 
     <groupId>com.aerolink</groupId>
     <artifactId>aerolink</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.0-SNAPSHOT</version>
     <name>aerolink</name>
     <description>Aerolink Spring Boot Application</description>
 
@@ -32,17 +32,23 @@
             <artifactId>httpclient5</artifactId>
         </dependency>
 
+        <!--
+            Bucket4j: token bucket rate limiting library.
+            Decision: Bucket4j is lightweight, in-memory, and does not require
+            additional infrastructure (e.g. Redis) for a single-instance service.
+            Refill strategy ensures exactly 60 tokens are available per minute.
+        -->
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j-core</artifactId>
+            <version>8.10.1</version>
+        </dependency>
+
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
-
-        <!--
-            Logstash Logback Encoder: formats log output as structured JSON.
-            Enables log aggregation tools (e.g. ELK, Datadog) to parse and
-            query logs without regex — each field is a first-class JSON key.
-        -->
         <dependency>
             <groupId>net.logstash.logback</groupId>
             <artifactId>logstash-logback-encoder</artifactId>
