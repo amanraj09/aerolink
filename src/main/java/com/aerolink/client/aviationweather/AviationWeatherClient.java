@@ -16,12 +16,10 @@ import io.github.bucket4j.ConsumptionProbe;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.retry.support.RetryTemplate;
-import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
@@ -35,21 +33,20 @@ import java.util.List;
  * RestClient-based implementation of {@link AviationDataProvider} for public Aviation Weather API.
  */
 @Slf4j
-@Component
 public class AviationWeatherClient implements AviationDataProvider {
 
-    private static final String AIRPORT_PATH = "/airport";
-    private final long NANOS_PER_SECOND = 1000000000;
+    private final String AIRPORT_PATH = "/airport";
+    private final int NANOS_PER_SECOND = 1000000000;
 
     private final RestClient restClient;
     private final Bucket rateLimiterBucket;
     private final RetryTemplate retryTemplate;
     private final CircuitBreaker circuitBreaker;
 
-    public AviationWeatherClient(@Qualifier(AeroLinkConstants.AVIATION_WEATHER_REST_CLIENT) RestClient aviationWeatherRestClient,
-                                 @Qualifier(AeroLinkConstants.AVIATION_WEATHER_CLIENT_RATE_LIMITER) Bucket rateLimiterBucket,
-                                 @Qualifier(AeroLinkConstants.AVIATION_WEATHER_CLIENT_RETRY) RetryTemplate retryTemplate,
-                                 @Qualifier(AeroLinkConstants.AVIATION_WEATHER_CLIENT_CIRCUIT_BREAKER) CircuitBreaker aviationWeatherCircuitBreaker) {
+    public AviationWeatherClient(RestClient aviationWeatherRestClient,
+                                 Bucket rateLimiterBucket,
+                                 RetryTemplate retryTemplate,
+                                 CircuitBreaker aviationWeatherCircuitBreaker) {
         this.restClient = aviationWeatherRestClient;
         this.rateLimiterBucket = rateLimiterBucket;
         this.retryTemplate = retryTemplate;
