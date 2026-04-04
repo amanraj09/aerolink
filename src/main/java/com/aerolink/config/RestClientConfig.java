@@ -1,5 +1,6 @@
 package com.aerolink.config;
 
+import com.aerolink.constant.AeroLinkConstants;
 import com.aerolink.properties.AviationWeatherProperties;
 import org.apache.hc.client5.http.classic.HttpClient;
 import org.apache.hc.client5.http.config.RequestConfig;
@@ -29,7 +30,7 @@ public class RestClientConfig {
      * @param properties externalised client configuration
      * @return configured RestClient bean
      */
-    @Bean
+    @Bean(name = AeroLinkConstants.AVIATION_WEATHER_REST_CLIENT)
     public RestClient aviationWeatherRestClient(AviationWeatherProperties properties) {
         return RestClient.builder()
                 .baseUrl(properties.baseUrl())

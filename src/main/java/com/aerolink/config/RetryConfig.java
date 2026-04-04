@@ -1,6 +1,7 @@
 package com.aerolink.config;
 
 import com.aerolink.exception.AeroLinkException;
+import com.aerolink.constant.AeroLinkConstants;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.retry.policy.SimpleRetryPolicy;
@@ -27,7 +28,7 @@ public class RetryConfig {
     private static final long INITIAL_BACKOFF_MS = 200;
     private static final double BACKOFF_MULTIPLIER = 2.0;
 
-    @Bean
+    @Bean(name = AeroLinkConstants.AVIATION_WEATHER_CLIENT_RETRY)
     public RetryTemplate retryTemplate() {
         ExponentialBackOffPolicy backOffPolicy = new ExponentialBackOffPolicy();
         backOffPolicy.setInitialInterval(INITIAL_BACKOFF_MS);

@@ -13,6 +13,8 @@ import com.aerolink.model.response.AirportOperations;
 import com.aerolink.model.response.RunwayDetail;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
@@ -31,24 +33,31 @@ import java.util.List;
 public class AviationWeatherClient implements AviationDataProvider {
 
     private static final String AIRPORT_PATH = "/airport";
-    private final long NANOS_PER_SECOND = 1000000000L;
-
+    private final long NANOS_PER_SECOND = 1000000000;
 
     private final RestClient restClient;
     private final Bucket rateLimiterBucket;
     private final RetryTemplate retryTemplate;
+    private final CircuitBreaker circuitBreaker;
 
-    public AviationWeatherClient(RestClient aviationWeatherRestClient,
+    public AviationWeatherClient(@Qualifier(AeroLinkConstants.AVIATION_WEATHER_REST_CLIENT) RestClient aviationWeatherRestClient,
                                  @Qualifier(AeroLinkConstants.AVIATION_WEATHER_CLIENT_RATE_LIMITER) Bucket rateLimiterBucket,
-                                 RetryTemplate retryTemplate) {
+                                 @Qualifier(AeroLinkConstants.AVIATION_WEATHER_CLIENT_RETRY) RetryTemplate retryTemplate,
+                                 @Qualifier(AeroLinkConstants.AVIATION_WEATHER_CLIENT_CIRCUIT_BREAKER) CircuitBreaker aviationWeatherCircuitBreaker) {
         this.restClient = aviationWeatherRestClient;
         this.rateLimiterBucket = rateLimiterBucket;
         this.retryTemplate = retryTemplate;
+        this.circuitBreaker = aviationWeatherCircuitBreaker;
     }
 
     /**
      * Fetches airport details for the given ICAO codes in a single upstream API call.
-     * Rate limited to 60 requests/min and retried up to 2 times with exponential backoff on failure.
+     *
+     * Execution order:
+     *   1. Rate limit check  — rejects immediately if quota exhausted
+     *   2. Circuit breaker   — rejects immediately if circuit is open
+     *   3. Retry             — retries up to set number of times with exponential backoff on failure
+     *   4. HTTP call         — actual call to Aviation Weather API
      *
      * @param icaoCodes list of ICAO codes to look up
      * @return list of mapped {@link AirportDetail} objects
@@ -64,33 +73,40 @@ public class AviationWeatherClient implements AviationDataProvider {
             throw new AeroLinkException(ErrorCode.RATE_LIMIT_EXCEEDED);
         }
 
-        return retryTemplate.execute(context -> {
-            int attempt = context.getRetryCount() + 1;
-            log.info("Attempt {} — calling Aviation Weather API for IDs: {}", attempt, ids);
+        try {
+            return circuitBreaker.executeSupplier(() ->
+                    retryTemplate.execute(context -> {
+                        int attempt = context.getRetryCount() + 1;
+                        log.info("Attempt {} — calling Aviation Weather API for IDs: {}", attempt, ids);
 
-            List<AviationWeatherRawResponse> rawResponses = restClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path(AIRPORT_PATH)
-                            .queryParam("format", "json")
-                            .queryParam("ids", ids)
-                            .build())
-                    .retrieve()
-                    .body(new ParameterizedTypeReference<>() {});
+                        List<AviationWeatherRawResponse> rawResponses = restClient.get()
+                                .uri(uriBuilder -> uriBuilder
+                                        .path(AIRPORT_PATH)
+                                        .queryParam("format", "json")
+                                        .queryParam("ids", ids)
+                                        .build())
+                                .retrieve()
+                                .body(new ParameterizedTypeReference<>() {});
 
-            if (CollectionUtils.isEmpty(rawResponses)) {
-                log.warn("Aviation Weather API returned empty response for IDs: {}", ids);
-                return List.of();
-            }
+                        if (CollectionUtils.isEmpty(rawResponses)) {
+                            log.warn("Aviation Weather API returned empty response for IDs: {}", ids);
+                            return List.of();
+                        }
 
-            log.info("Aviation Weather API returned {} result(s) for IDs: {}", rawResponses.size(), ids);
-            return rawResponses.stream()
-                    .map(this::mapToAirportDetail)
-                    .toList();
+                        log.info("Aviation Weather API returned {} result(s) for IDs: {}", rawResponses.size(), ids);
+                        return rawResponses.stream()
+                                .map(this::mapToAirportDetail)
+                                .toList();
 
-        }, context -> {
-            log.error("All {} attempts exhausted for IDs: {}", context.getRetryCount(), ids);
+                    }, context -> {
+                        log.error("All {} attempt(s) exhausted for IDs: {}", context.getRetryCount(), ids);
+                        throw new AeroLinkException(ErrorCode.UPSTREAM_API_ERROR);
+                    })
+            );
+        } catch (CallNotPermittedException ex) {
+            log.error("Circuit breaker is OPEN — upstream calls blocked for IDs: {}", ids);
             throw new AeroLinkException(ErrorCode.UPSTREAM_API_ERROR);
-        });
+        }
     }
 
     /**
