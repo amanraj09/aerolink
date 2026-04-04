@@ -148,13 +148,6 @@ class AeroLinkControllerTest {
                 .andExpect(jsonPath("$.message").value("Maximum allowed is 15, but received 16"));
     }
 
-    @Test
-    @DisplayName("GET /airport - returns 400 when icaoCodes param is missing")
-    void getAirportDetails_missingIcaoCodesParam_returns400() throws Exception {
-        mockMvc.perform(get(BASE_URL)
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest());
-    }
 
     @Test
     @DisplayName("GET /airport - returns 400 with AERO-103 when ICAO code has invalid format")

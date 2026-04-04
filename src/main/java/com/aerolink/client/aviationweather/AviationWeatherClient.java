@@ -23,8 +23,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
+import java.net.SocketTimeoutException;
 import java.util.List;
 
 /**
@@ -63,7 +67,6 @@ public class AviationWeatherClient implements AviationDataProvider {
         String ids = String.join(",", icaoCodes);
 
         ConsumptionProbe probe = rateLimiterBucket.tryConsumeAndReturnRemaining(1);
-        //Rate limit check  — rejects immediately if quota exhausted
         if (!probe.isConsumed()) {
             long retryAfterSeconds = probe.getNanosToWaitForRefill() / NANOS_PER_SECOND;
             log.warn("Aviation Weather API rate limit reached. Retry after {}s", retryAfterSeconds);
@@ -71,12 +74,9 @@ public class AviationWeatherClient implements AviationDataProvider {
         }
 
         try {
-            //Circuit breaker   — rejects immediately if circuit is open
             return circuitBreaker.executeSupplier(() ->
-                    //Retry — retries up to set number of times with exponential backoff on failure
                     retryTemplate.execute(context -> {
-                        int attempt = context.getRetryCount() + 1;
-                        log.info("Attempt {} — calling Aviation Weather API for IDs: {}", attempt, ids);
+                        log.info("Attempt {} — calling Aviation Weather API for IDs: {}", context.getRetryCount() + 1, ids);
 
                         ResponseEntity<List<AviationWeatherRawResponse>> response = restClient.get()
                                 .uri(uriBuilder -> uriBuilder
@@ -85,6 +85,14 @@ public class AviationWeatherClient implements AviationDataProvider {
                                         .queryParam("ids", ids)
                                         .build())
                                 .retrieve()
+                                .onStatus(HttpStatusCode::is4xxClientError, (request, apiResponse) -> {
+                                    log.error("Aviation Weather API returned HTTP {} for IDs: {} — not retrying", apiResponse.getStatusCode().value(), ids);
+                                    throw new AeroLinkException(ErrorCode.UPSTREAM_CLIENT_ERROR);
+                                })
+                                .onStatus(status -> status.value() == 500, (request, apiResponse) -> {
+                                    log.error("Aviation Weather API returned HTTP 500 for IDs: {} — not retrying", ids);
+                                    throw new AeroLinkException(ErrorCode.UPSTREAM_SERVER_ERROR);
+                                })
                                 .toEntity(new ParameterizedTypeReference<>() {});
 
                         HttpStatusCode statusCode = response.getStatusCode();
@@ -105,10 +113,26 @@ public class AviationWeatherClient implements AviationDataProvider {
                         throw new AeroLinkException(ErrorCode.UPSTREAM_API_TEMPORARILY_UNAVAILABLE_ERROR);
                     })
             );
-        } catch (CallNotPermittedException ex) {
-            log.error("Circuit breaker is OPEN — upstream calls blocked for IDs: {}. Error is : ", ids, ex);
-            throw new AeroLinkException(ErrorCode.UPSTREAM_API_TEMPORARILY_UNAVAILABLE_ERROR);
+        } catch (RestClientException | CallNotPermittedException ex) {
+            throw handleUpstreamException(ex, ids);
         }
+    }
+
+    private AeroLinkException handleUpstreamException(Exception ex, String ids) {
+        if (ex instanceof CallNotPermittedException) {
+            log.error("Circuit breaker is OPEN — upstream calls blocked for IDs: {}", ids);
+            return new AeroLinkException(ErrorCode.UPSTREAM_API_TEMPORARILY_UNAVAILABLE_ERROR);
+        }
+        if (ex instanceof HttpServerErrorException e) {
+            log.error("Upstream returned HTTP {} for IDs: {} — retries exhausted", e.getStatusCode().value(), ids);
+            return new AeroLinkException(ErrorCode.UPSTREAM_API_TEMPORARILY_UNAVAILABLE_ERROR);
+        }
+        if (ex instanceof ResourceAccessException) {
+            log.error("Network failure reaching upstream for IDs: {}", ids);
+            return new AeroLinkException(ErrorCode.UPSTREAM_SERVER_ERROR);
+        }
+        log.error("Upstream communication error for IDs: {} — {}", ids, ex.getMessage());
+        return new AeroLinkException(ErrorCode.UPSTREAM_RESPONSE_PARSE_ERROR);
     }
 
     /**

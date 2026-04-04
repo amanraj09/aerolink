@@ -1,5 +1,6 @@
 package com.aerolink.exception;
 
+import com.aerolink.model.error.ErrorCode;
 import com.aerolink.model.error.ErrorResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -29,5 +30,15 @@ public class GlobalExceptionHandler {
         }
 
         return responseBuilder.body(new ErrorResponse(ex.getErrorCode().getCode(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleUnexpectedException(Exception ex) {
+        log.error("Unexpected error: {}", ex.getMessage(), ex);
+        return ResponseEntity
+                .status(ErrorCode.INTERNAL_SERVER_ERROR.getHttpStatus())
+                .body(new ErrorResponse(
+                        ErrorCode.INTERNAL_SERVER_ERROR.getCode(),
+                        ErrorCode.INTERNAL_SERVER_ERROR.getDescription()));
     }
 }
