@@ -18,6 +18,8 @@ import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ResponseEntity;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
@@ -76,21 +78,24 @@ public class AviationWeatherClient implements AviationDataProvider {
                         int attempt = context.getRetryCount() + 1;
                         log.info("Attempt {} — calling Aviation Weather API for IDs: {}", attempt, ids);
 
-                        List<AviationWeatherRawResponse> rawResponses = restClient.get()
+                        ResponseEntity<List<AviationWeatherRawResponse>> response = restClient.get()
                                 .uri(uriBuilder -> uriBuilder
                                         .path(AIRPORT_PATH)
                                         .queryParam("format", "json")
                                         .queryParam("ids", ids)
                                         .build())
                                 .retrieve()
-                                .body(new ParameterizedTypeReference<>() {});
+                                .toEntity(new ParameterizedTypeReference<>() {});
 
-                        if (CollectionUtils.isEmpty(rawResponses)) {
-                            log.warn("Aviation Weather API returned empty response for IDs: {}", ids);
+                        HttpStatusCode statusCode = response.getStatusCode();
+                        List<AviationWeatherRawResponse> rawResponses = response.getBody();
+
+                        if (statusCode.value() == 204 || CollectionUtils.isEmpty(rawResponses)) {
+                            log.warn("Aviation Weather API returned HTTP {} with no results for IDs: {}", statusCode.value(), ids);
                             return List.of();
                         }
 
-                        log.info("Aviation Weather API returned {} result(s) for IDs: {}", rawResponses.size(), ids);
+                        log.info("Aviation Weather API returned HTTP {} with {} result(s) for IDs: {}", statusCode.value(), rawResponses.size(), ids);
                         return rawResponses.stream()
                                 .map(this::mapToAirportDetail)
                                 .toList();
