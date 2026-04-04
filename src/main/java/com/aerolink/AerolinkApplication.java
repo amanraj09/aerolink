@@ -8,8 +8,7 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 @ConfigurationPropertiesScan
 public class AerolinkApplication {
 
-    public static void main(String[] args) {
-        SpringApplication.run(AerolinkApplication.class, args);
-    }
-
+  public static void main(String[] args) {
+    SpringApplication.run(AerolinkApplication.class, args);
+  }
 }

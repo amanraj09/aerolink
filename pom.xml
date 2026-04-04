@@ -19,6 +19,10 @@
 
     <properties>
         <java.version>21</java.version>
+        <resilience4j.version>2.2.0</resilience4j.version>
+        <bucket4j.version>8.10.1</bucket4j.version>
+        <logstash-logback-encoder.version>7.4</logstash-logback-encoder.version>
+        <fmt-maven-plugin.version>2.29</fmt-maven-plugin.version>
     </properties>
 
     <dependencies>
@@ -38,12 +42,12 @@
         <dependency>
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-spring-boot3</artifactId>
-            <version>2.2.0</version>
+            <version>${resilience4j.version}</version>
         </dependency>
         <dependency>
             <groupId>com.bucket4j</groupId>
             <artifactId>bucket4j-core</artifactId>
-            <version>8.10.1</version>
+            <version>${bucket4j.version}</version>
         </dependency>
 
         <dependency>
@@ -54,7 +58,7 @@
         <dependency>
             <groupId>net.logstash.logback</groupId>
             <artifactId>logstash-logback-encoder</artifactId>
-            <version>7.4</version>
+            <version>${logstash-logback-encoder.version}</version>
         </dependency>
 
         <dependency>
@@ -89,6 +93,18 @@
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>com.spotify.fmt</groupId>
+                <artifactId>fmt-maven-plugin</artifactId>
+                <version>${fmt-maven-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>format</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

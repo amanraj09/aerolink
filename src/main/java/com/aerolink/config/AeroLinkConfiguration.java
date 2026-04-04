@@ -8,6 +8,8 @@ import com.aerolink.properties.AviationProviderProperties;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import java.time.Duration;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.hc.client5.http.classic.HttpClient;
 import org.apache.hc.client5.http.config.RequestConfig;
@@ -26,107 +28,109 @@ import org.springframework.retry.support.RetryTemplate;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
-import java.time.Duration;
-import java.util.Map;
-
 @Slf4j
 @Configuration
 @EnableConfigurationProperties(AviationProviderProperties.class)
 public class AeroLinkConfiguration {
 
-    // ─── RestClient ───────────────────────────────────────────────────────────
+  // ─── RestClient ───────────────────────────────────────────────────────────
 
-    @Bean(name = AeroLinkConstants.PROVIDER_REST_CLIENT)
-    public RestClient restClient(AviationProviderProperties properties) {
-        return RestClient.builder()
-                .baseUrl(properties.baseUrl())
-                .requestFactory(buildRequestFactory(properties))
-                .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
-                .build();
-    }
+  @Bean(name = AeroLinkConstants.PROVIDER_REST_CLIENT)
+  public RestClient restClient(AviationProviderProperties properties) {
+    return RestClient.builder()
+        .baseUrl(properties.baseUrl())
+        .requestFactory(buildRequestFactory(properties))
+        .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+        .build();
+  }
 
-    private HttpComponentsClientHttpRequestFactory buildRequestFactory(AviationProviderProperties properties) {
-        PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
-        connectionManager.setMaxTotal(properties.maxTotalConnections());
-        connectionManager.setDefaultMaxPerRoute(properties.maxConnectionsPerRoute());
+  private HttpComponentsClientHttpRequestFactory buildRequestFactory(
+      AviationProviderProperties properties) {
+    PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
+    connectionManager.setMaxTotal(properties.maxTotalConnections());
+    connectionManager.setDefaultMaxPerRoute(properties.maxConnectionsPerRoute());
 
-        RequestConfig requestConfig = RequestConfig.custom()
-                .setConnectionRequestTimeout(Timeout.of(properties.connectTimeout()))
-                .setResponseTimeout(Timeout.of(properties.readTimeout()))
-                .build();
+    RequestConfig requestConfig =
+        RequestConfig.custom()
+            .setConnectionRequestTimeout(Timeout.of(properties.connectTimeout()))
+            .setResponseTimeout(Timeout.of(properties.readTimeout()))
+            .build();
 
-        HttpClient httpClient = HttpClients.custom()
-                .setConnectionManager(connectionManager)
-                .setDefaultRequestConfig(requestConfig)
-                .build();
+    HttpClient httpClient =
+        HttpClients.custom()
+            .setConnectionManager(connectionManager)
+            .setDefaultRequestConfig(requestConfig)
+            .build();
 
-        return new HttpComponentsClientHttpRequestFactory(httpClient);
-    }
+    return new HttpComponentsClientHttpRequestFactory(httpClient);
+  }
 
-    // ─── Retry ────────────────────────────────────────────────────────────────
+  // ─── Retry ────────────────────────────────────────────────────────────────
 
-    private static final int    MAX_ATTEMPTS       = 3;
-    private static final long   INITIAL_BACKOFF_MS = 200;
-    private static final double BACKOFF_MULTIPLIER = 2.0;
+  private static final int MAX_ATTEMPTS = 3;
+  private static final long INITIAL_BACKOFF_MS = 200;
+  private static final double BACKOFF_MULTIPLIER = 2.0;
 
-    @Bean(name = AeroLinkConstants.PROVIDER_RETRY)
-    public RetryTemplate retryTemplate() {
-        ExponentialBackOffPolicy backOffPolicy = new ExponentialBackOffPolicy();
-        backOffPolicy.setInitialInterval(INITIAL_BACKOFF_MS);
-        backOffPolicy.setMultiplier(BACKOFF_MULTIPLIER);
+  @Bean(name = AeroLinkConstants.PROVIDER_RETRY)
+  public RetryTemplate retryTemplate() {
+    ExponentialBackOffPolicy backOffPolicy = new ExponentialBackOffPolicy();
+    backOffPolicy.setInitialInterval(INITIAL_BACKOFF_MS);
+    backOffPolicy.setMultiplier(BACKOFF_MULTIPLIER);
 
-        SimpleRetryPolicy retryPolicy = new SimpleRetryPolicy(MAX_ATTEMPTS,
-                Map.of(RestClientException.class, true));
+    SimpleRetryPolicy retryPolicy =
+        new SimpleRetryPolicy(MAX_ATTEMPTS, Map.of(RestClientException.class, true));
 
-        RetryTemplate template = new RetryTemplate();
-        template.setBackOffPolicy(backOffPolicy);
-        template.setRetryPolicy(retryPolicy);
-        return template;
-    }
+    RetryTemplate template = new RetryTemplate();
+    template.setBackOffPolicy(backOffPolicy);
+    template.setRetryPolicy(retryPolicy);
+    return template;
+  }
 
-    // ─── Circuit Breaker ──────────────────────────────────────────────────────
+  // ─── Circuit Breaker ──────────────────────────────────────────────────────
 
-    private static final int   SLIDING_WINDOW_SIZE        = 10;
-    private static final float FAILURE_RATE_THRESHOLD     = 50.0f;
-    private static final int   WAIT_DURATION_OPEN_SECONDS = 10;
-    private static final int   HALF_OPEN_PERMITTED_CALLS  = 3;
+  private static final int SLIDING_WINDOW_SIZE = 10;
+  private static final float FAILURE_RATE_THRESHOLD = 50.0f;
+  private static final int WAIT_DURATION_OPEN_SECONDS = 10;
+  private static final int HALF_OPEN_PERMITTED_CALLS = 3;
 
-    @Bean(name = AeroLinkConstants.PROVIDER_CIRCUIT_BREAKER)
-    public CircuitBreaker circuitBreaker() {
-        io.github.resilience4j.circuitbreaker.CircuitBreakerConfig config =
-                io.github.resilience4j.circuitbreaker.CircuitBreakerConfig.custom()
-                        .slidingWindowSize(SLIDING_WINDOW_SIZE)
-                        .failureRateThreshold(FAILURE_RATE_THRESHOLD)
-                        .waitDurationInOpenState(Duration.ofSeconds(WAIT_DURATION_OPEN_SECONDS))
-                        .permittedNumberOfCallsInHalfOpenState(HALF_OPEN_PERMITTED_CALLS)
-                        .recordExceptions(RestClientException.class)
-                        .ignoreExceptions(AeroLinkException.class)
-                        .build();
+  @Bean(name = AeroLinkConstants.PROVIDER_CIRCUIT_BREAKER)
+  public CircuitBreaker circuitBreaker() {
+    io.github.resilience4j.circuitbreaker.CircuitBreakerConfig config =
+        io.github.resilience4j.circuitbreaker.CircuitBreakerConfig.custom()
+            .slidingWindowSize(SLIDING_WINDOW_SIZE)
+            .failureRateThreshold(FAILURE_RATE_THRESHOLD)
+            .waitDurationInOpenState(Duration.ofSeconds(WAIT_DURATION_OPEN_SECONDS))
+            .permittedNumberOfCallsInHalfOpenState(HALF_OPEN_PERMITTED_CALLS)
+            .recordExceptions(RestClientException.class)
+            .ignoreExceptions(AeroLinkException.class)
+            .build();
 
-        return CircuitBreaker.of("aviationWeather", config);
-    }
+    return CircuitBreaker.of("aviationWeather", config);
+  }
 
-    // ─── Rate Limiter ─────────────────────────────────────────────────────────
+  // ─── Rate Limiter ─────────────────────────────────────────────────────────
 
-    private static final int TOKEN_REFILL_RATE = 1;
+  private static final int TOKEN_REFILL_RATE = 1;
 
-    @Bean(name = AeroLinkConstants.PROVIDER_RATE_LIMITER)
-    public Bucket rateLimiterBucket(AviationProviderProperties properties) {
-        Bandwidth limit = Bandwidth.builder()
-                .capacity(properties.requestLimitPerMinute())
-                .refillGreedy(TOKEN_REFILL_RATE, Duration.ofSeconds(1))
-                .build();
+  @Bean(name = AeroLinkConstants.PROVIDER_RATE_LIMITER)
+  public Bucket rateLimiterBucket(AviationProviderProperties properties) {
+    Bandwidth limit =
+        Bandwidth.builder()
+            .capacity(properties.requestLimitPerMinute())
+            .refillGreedy(TOKEN_REFILL_RATE, Duration.ofSeconds(1))
+            .build();
 
-        return Bucket.builder()
-                .addLimit(limit)
-                .build();
-    }
+    return Bucket.builder().addLimit(limit).build();
+  }
 
-    // ─── Client ───────────────────────────────────────────────────────────────
+  // ─── Client ───────────────────────────────────────────────────────────────
 
-    @Bean
-    public AviationDataProvider aviationWeatherClient(RestClient restClient, Bucket rateLimiterBucket,
-                                                      RetryTemplate retryTemplate, CircuitBreaker circuitBreaker) {
-        return new AviationWeatherClient(restClient, rateLimiterBucket, retryTemplate, circuitBreaker);
-    }
+  @Bean
+  public AviationDataProvider aviationWeatherClient(
+      RestClient restClient,
+      Bucket rateLimiterBucket,
+      RetryTemplate retryTemplate,
+      CircuitBreaker circuitBreaker) {
+    return new AviationWeatherClient(restClient, rateLimiterBucket, retryTemplate, circuitBreaker);
+  }
 }
