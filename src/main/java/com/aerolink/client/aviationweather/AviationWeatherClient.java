@@ -70,7 +70,7 @@ public class AviationWeatherClient implements AviationDataProvider {
         if (!probe.isConsumed()) {
             long retryAfterSeconds = probe.getNanosToWaitForRefill() / NANOS_PER_SECOND;
             log.warn("Aviation Weather API rate limit reached. Retry after {}s", retryAfterSeconds);
-            throw new AeroLinkException(ErrorCode.RATE_LIMIT_EXCEEDED);
+            throw new AeroLinkException(ErrorCode.UPSTREAM_RATE_LIMIT_EXCEEDED, retryAfterSeconds);
         }
 
         try {
@@ -100,12 +100,12 @@ public class AviationWeatherClient implements AviationDataProvider {
 
                     }, context -> {
                         log.error("All {} attempt(s) exhausted for IDs: {}", context.getRetryCount(), ids);
-                        throw new AeroLinkException(ErrorCode.UPSTREAM_API_ERROR);
+                        throw new AeroLinkException(ErrorCode.UPSTREAM_API_TEMPORARILY_UNAVAILABLE_ERROR);
                     })
             );
         } catch (CallNotPermittedException ex) {
-            log.error("Circuit breaker is OPEN — upstream calls blocked for IDs: {}", ids);
-            throw new AeroLinkException(ErrorCode.UPSTREAM_API_ERROR);
+            log.error("Circuit breaker is OPEN — upstream calls blocked for IDs: {}. Error is : ", ids, ex);
+            throw new AeroLinkException(ErrorCode.UPSTREAM_API_TEMPORARILY_UNAVAILABLE_ERROR);
         }
     }
 

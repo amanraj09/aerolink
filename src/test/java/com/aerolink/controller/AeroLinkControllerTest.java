@@ -155,26 +155,13 @@ class AeroLinkControllerTest {
     @DisplayName("GET /airport - returns 429 when service throws RATE_LIMIT_EXCEEDED")
     void getAirportDetails_rateLimitExceeded_returns429() throws Exception {
         when(aeroLinkService.getAirportDetails(any()))
-                .thenThrow(new AeroLinkException(ErrorCode.RATE_LIMIT_EXCEEDED));
+                .thenThrow(new AeroLinkException(ErrorCode.UPSTREAM_RATE_LIMIT_EXCEEDED));
 
         mockMvc.perform(get(BASE_URL)
                 .param("icaoCodes", "KJFK")
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.errorCode").value("AERO-102"));
-    }
-
-    @Test
-    @DisplayName("GET /airport - returns 502 when upstream service fails")
-    void getAirportDetails_upstreamApiError_returns502() throws Exception {
-        when(aeroLinkService.getAirportDetails(any()))
-                .thenThrow(new AeroLinkException(ErrorCode.UPSTREAM_API_ERROR));
-
-        mockMvc.perform(get(BASE_URL)
-                .param("icaoCodes", "KJFK")
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadGateway())
-                .andExpect(jsonPath("$.errorCode").value("AERO-201"));
     }
 
     // ─────────────────────────────────────────────

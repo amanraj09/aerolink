@@ -20,8 +20,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AeroLinkException.class)
     public ResponseEntity<ErrorResponse> handleAeroLinkException(AeroLinkException ex) {
         log.error("AeroLinkException: [{}] {}", ex.getErrorCode().getCode(), ex.getMessage());
-        return ResponseEntity
-                .status(ex.getErrorCode().getHttpStatus())
-                .body(new ErrorResponse(ex.getErrorCode().getCode(), ex.getMessage()));
+        var responseBuilder = ResponseEntity
+                .status(ex.getErrorCode().getHttpStatus());
+
+        // Add Retry-After header if available (for 429 rate limit responses)
+        if (ex.getRetryAfterSeconds() != null) {
+            responseBuilder.header("Retry-After", ex.getRetryAfterSeconds().toString());
+        }
+
+        return responseBuilder.body(new ErrorResponse(ex.getErrorCode().getCode(), ex.getMessage()));
     }
 }
