@@ -33,6 +33,15 @@
         </dependency>
 
         <!--
+            Spring Retry: provides RetryTemplate for programmatic retry with
+            exponential backoff. No AOP needed since we call RetryTemplate directly.
+        -->
+        <dependency>
+            <groupId>org.springframework.retry</groupId>
+            <artifactId>spring-retry</artifactId>
+        </dependency>
+
+        <!--
             Bucket4j: token bucket rate limiting library.
             Decision: Bucket4j is lightweight, in-memory, and does not require
             additional infrastructure (e.g. Redis) for a single-instance service.

@@ -13,8 +13,10 @@ import org.springframework.http.HttpStatus;
 @Getter
 public enum ErrorCode {
 
-    ICAO_LIMIT_EXCEEDED("AERO-100", "Number of ICAO codes exceeds the maximum allowed limit", HttpStatus.BAD_REQUEST),
-    RATE_LIMIT_EXCEEDED("AERO-102", "Too many requests. Rate limit of 60 requests per minute exceeded", HttpStatus.TOO_MANY_REQUESTS);
+    ICAO_LIMIT_EXCEEDED("AERO-101", "Number of ICAO codes exceeds the maximum allowed limit", HttpStatus.BAD_REQUEST),
+    RATE_LIMIT_EXCEEDED("AERO-102", "Too many requests. Rate limit of 60 requests per minute exceeded", HttpStatus.TOO_MANY_REQUESTS),
+
+    UPSTREAM_API_ERROR("AERO-201", "Upstream aviation API returned an error", HttpStatus.BAD_GATEWAY);
 
     private final String code;
     private final String description;

@@ -1,7 +1,7 @@
 package com.aerolink.controller;
 
+import com.aerolink.exception.AeroLinkException;
 import com.aerolink.model.error.ErrorCode;
-import com.aerolink.model.error.ErrorResponse;
 import com.aerolink.model.response.AirportDetail;
 import com.aerolink.service.AeroLinkService;
 import lombok.extern.slf4j.Slf4j;
@@ -34,17 +34,16 @@ public class AeroLinkController {
      * Maximum of 15 ICAO codes allowed per request.
      *
      * @param icaoCodes list of 4-letter ICAO airport identifiers (max 15)
-     * @return 200 with list of {@link AirportDetail}, or 400 if more than 15 codes supplied
+     * @return 200 with list of {@link AirportDetail}
      */
     @GetMapping("/airport")
-    public ResponseEntity<?> getAirportDetails(@RequestParam List<String> icaoCodes) {
+    public ResponseEntity<List<AirportDetail>> getAirportDetails(@RequestParam List<String> icaoCodes) {
         log.info("Received request for {} ICAO code(s): {}", icaoCodes.size(), icaoCodes);
 
         if (icaoCodes.size() > MAX_ICAO_CODES) {
             log.error("Request rejected — {} ICAO codes exceeds limit of {}", icaoCodes.size(), MAX_ICAO_CODES);
-            return ResponseEntity.badRequest()
-                    .body(ErrorResponse.of(ErrorCode.ICAO_LIMIT_EXCEEDED,
-                            "Maximum allowed is " + MAX_ICAO_CODES + ", but received " + icaoCodes.size()));
+            throw new AeroLinkException(ErrorCode.ICAO_LIMIT_EXCEEDED,
+                    "Maximum allowed is " + MAX_ICAO_CODES + ", but received " + icaoCodes.size());
         }
 
         List<AirportDetail> airportDetails = aeroLinkService.getAirportDetails(icaoCodes);
