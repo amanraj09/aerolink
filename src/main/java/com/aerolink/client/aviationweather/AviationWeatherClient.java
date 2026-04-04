@@ -53,12 +53,6 @@ public class AviationWeatherClient implements AviationDataProvider {
     /**
      * Fetches airport details for the given ICAO codes in a single upstream API call.
      *
-     * Execution order:
-     *   1. Rate limit check  — rejects immediately if quota exhausted
-     *   2. Circuit breaker   — rejects immediately if circuit is open
-     *   3. Retry             — retries up to set number of times with exponential backoff on failure
-     *   4. HTTP call         — actual call to Aviation Weather API
-     *
      * @param icaoCodes list of ICAO codes to look up
      * @return list of mapped {@link AirportDetail} objects
      */
@@ -67,6 +61,7 @@ public class AviationWeatherClient implements AviationDataProvider {
         String ids = String.join(",", icaoCodes);
 
         ConsumptionProbe probe = rateLimiterBucket.tryConsumeAndReturnRemaining(1);
+        //Rate limit check  — rejects immediately if quota exhausted
         if (!probe.isConsumed()) {
             long retryAfterSeconds = probe.getNanosToWaitForRefill() / NANOS_PER_SECOND;
             log.warn("Aviation Weather API rate limit reached. Retry after {}s", retryAfterSeconds);
@@ -74,7 +69,9 @@ public class AviationWeatherClient implements AviationDataProvider {
         }
 
         try {
+            //Circuit breaker   — rejects immediately if circuit is open
             return circuitBreaker.executeSupplier(() ->
+                    //Retry — retries up to set number of times with exponential backoff on failure
                     retryTemplate.execute(context -> {
                         int attempt = context.getRetryCount() + 1;
                         log.info("Attempt {} — calling Aviation Weather API for IDs: {}", attempt, ids);

@@ -3,11 +3,14 @@ package com.aerolink.controller;
 import com.aerolink.exception.AeroLinkException;
 import com.aerolink.model.error.ErrorCode;
 import com.aerolink.model.response.AirportDetail;
+import com.aerolink.model.response.AirportIdentifier;
 import com.aerolink.service.AeroLinkService;
+import com.aerolink.util.RequestValidator;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -21,11 +24,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Unit tests for {@link AeroLinkController}.
  *
- * Uses {@code @WebMvcTest} to load only the web layer (controller + exception
- * handler),
- * with {@link AeroLinkService} mocked via {@code @MockBean}.
+ * Uses {@code @WebMvcTest} to load only the web layer (controller + exception handler).
+ * {@link RequestValidator} is imported directly since {@code @WebMvcTest} does not
+ * auto-scan {@code @Component} beans outside the web layer.
+ * {@link AeroLinkService} is mocked via {@code @MockitoBean}.
  */
 @WebMvcTest(AeroLinkController.class)
+@Import(RequestValidator.class)
 class AeroLinkControllerTest {
 
     private static final String BASE_URL = "/api/v1/airport";
@@ -82,16 +87,16 @@ class AeroLinkControllerTest {
     @DisplayName("GET /airport - returns 200 with exactly 15 ICAO codes (boundary max)")
     void getAirportDetails_exactly15IcaoCodes_returns200() throws Exception {
         List<String> icaoCodes = List.of(
-                "KAA1", "KAA2", "KAA3", "KAA4", "KAA5",
-                "KAA6", "KAA7", "KAA8", "KAA9", "KAB0",
-                "KAB1", "KAB2", "KAB3", "KAB4", "KAB5");
+                "KAAA", "KAAB", "KAAC", "KAAD", "KAAE",
+                "KAAF", "KAAG", "KAAH", "KAAI", "KAAJ",
+                "KAAK", "KAAL", "KAAM", "KAAN", "KAAO");
         when(aeroLinkService.getAirportDetails(icaoCodes)).thenReturn(List.of());
 
         mockMvc.perform(get(BASE_URL)
                 .param("icaoCodes",
-                        "KAA1", "KAA2", "KAA3", "KAA4", "KAA5",
-                        "KAA6", "KAA7", "KAA8", "KAA9", "KAB0",
-                        "KAB1", "KAB2", "KAB3", "KAB4", "KAB5")
+                        "KAAA", "KAAB", "KAAC", "KAAD", "KAAE",
+                        "KAAF", "KAAG", "KAAH", "KAAI", "KAAJ",
+                        "KAAK", "KAAL", "KAAM", "KAAN", "KAAO")
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
 
@@ -119,12 +124,12 @@ class AeroLinkControllerTest {
     void getAirportDetails_over15IcaoCodes_returns400() throws Exception {
         mockMvc.perform(get(BASE_URL)
                 .param("icaoCodes",
-                        "KAA1", "KAA2", "KAA3", "KAA4", "KAA5",
-                        "KAA6", "KAA7", "KAA8", "KAA9", "KAB0",
-                        "KAB1", "KAB2", "KAB3", "KAB4", "KAB5", "KAB6")
+                        "KAAA", "KAAB", "KAAC", "KAAD", "KAAE",
+                        "KAAF", "KAAG", "KAAH", "KAAI", "KAAJ",
+                        "KAAK", "KAAL", "KAAM", "KAAN", "KAAO", "KAAP")
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("AERO-101"));
+                .andExpect(jsonPath("$.errorCode").value("AERO-102"));
 
         verifyNoInteractions(aeroLinkService);
     }
@@ -134,12 +139,12 @@ class AeroLinkControllerTest {
     void getAirportDetails_over15IcaoCodes_returnsCorrectErrorBody() throws Exception {
         mockMvc.perform(get(BASE_URL)
                 .param("icaoCodes",
-                        "KAA1", "KAA2", "KAA3", "KAA4", "KAA5",
-                        "KAA6", "KAA7", "KAA8", "KAA9", "KAB0",
-                        "KAB1", "KAB2", "KAB3", "KAB4", "KAB5", "KAB6")
+                        "KAAA", "KAAB", "KAAC", "KAAD", "KAAE",
+                        "KAAF", "KAAG", "KAAH", "KAAI", "KAAJ",
+                        "KAAK", "KAAL", "KAAM", "KAAN", "KAAO", "KAAP")
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("AERO-101"))
+                .andExpect(jsonPath("$.errorCode").value("AERO-102"))
                 .andExpect(jsonPath("$.message").value("Maximum allowed is 15, but received 16"));
     }
 
@@ -152,6 +157,19 @@ class AeroLinkControllerTest {
     }
 
     @Test
+    @DisplayName("GET /airport - returns 400 with AERO-103 when ICAO code has invalid format")
+    void getAirportDetails_invalidIcaoFormat_returns400() throws Exception {
+        mockMvc.perform(get(BASE_URL)
+                .param("icaoCodes", "KJF1")
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("AERO-103"))
+                .andExpect(jsonPath("$.message").value("Invalid ICAO code: 'KJF1'. Must be exactly 4 letters"));
+
+        verifyNoInteractions(aeroLinkService);
+    }
+
+    @Test
     @DisplayName("GET /airport - returns 429 when service throws RATE_LIMIT_EXCEEDED")
     void getAirportDetails_rateLimitExceeded_returns429() throws Exception {
         when(aeroLinkService.getAirportDetails(any()))
@@ -161,7 +179,7 @@ class AeroLinkControllerTest {
                 .param("icaoCodes", "KJFK")
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isTooManyRequests())
-                .andExpect(jsonPath("$.errorCode").value("AERO-102"));
+                .andExpect(jsonPath("$.errorCode").value("AERO-104"));
     }
 
     // ─────────────────────────────────────────────
@@ -169,7 +187,6 @@ class AeroLinkControllerTest {
     // ─────────────────────────────────────────────
 
     private AirportDetail buildMockAirportDetail(String icaoCode, String name) {
-        var identifier = new com.aerolink.model.response.AirportIdentifier(icaoCode, null, null);
-        return new AirportDetail(name, identifier, null, null, null, List.of());
+        return new AirportDetail(name, new AirportIdentifier(icaoCode, null, null), null, null, null, List.of());
     }
 }

@@ -27,11 +27,25 @@ public class AeroLinkService {
     /**
      * Retrieves airport details for the given list of ICAO codes.
      *
-     * @param icaoCodes list of 4-letter ICAO airport identifiers
+     * @param icaoCodes list of ICAO airport identifiers (case-insensitive)
      * @return list of {@link AirportDetail} objects
      */
     public List<AirportDetail> getAirportDetails(List<String> icaoCodes) {
-        log.info("Fetching airport details for {} ICAO code(s): {}", icaoCodes.size(), icaoCodes);
-        return aviationDataProvider.fetchAirportsByIcaoCodes(icaoCodes);
+        List<String> normalizedCodes = normalizeIcaoCodes(icaoCodes);
+        log.info("Fetching airport details for {} ICAO code(s): {}", normalizedCodes.size(), normalizedCodes);
+        return aviationDataProvider.fetchAirportsByIcaoCodes(normalizedCodes);
+    }
+
+    /**
+     * Normalizes ICAO codes to uppercase.
+     * Ensures consistent format before passing to the upstream API,
+     *
+     * @param icaoCodes raw ICAO codes from the request
+     * @return list of uppercased ICAO codes
+     */
+    private List<String> normalizeIcaoCodes(List<String> icaoCodes) {
+        return icaoCodes.stream()
+                .map(String::toUpperCase)
+                .toList();
     }
 }
