@@ -38,6 +38,17 @@
             <optional>true</optional>
         </dependency>
 
+        <!--
+            Logstash Logback Encoder: formats log output as structured JSON.
+            Enables log aggregation tools (e.g. ELK, Datadog) to parse and
+            query logs without regex — each field is a first-class JSON key.
+        -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>7.4</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
