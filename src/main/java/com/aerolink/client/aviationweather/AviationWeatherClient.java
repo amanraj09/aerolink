@@ -4,6 +4,7 @@ import com.aerolink.client.AviationDataProvider;
 import com.aerolink.client.model.AviationWeatherRawResponse;
 import com.aerolink.constant.AeroLinkConstants;
 import com.aerolink.exception.AeroLinkException;
+import com.aerolink.metrics.AeroLinkMetrics;
 import com.aerolink.model.error.ErrorCode;
 import com.aerolink.model.response.AirportCommunications;
 import com.aerolink.model.response.AirportDetail;
@@ -47,6 +48,7 @@ public class AviationWeatherClient implements AviationDataProvider {
   private final Bucket rateLimiterBucket;
   private final RetryTemplate retryTemplate;
   private final CircuitBreaker circuitBreaker;
+  private final AeroLinkMetrics metrics;
 
   @Autowired
   public AviationWeatherClient(
@@ -54,11 +56,13 @@ public class AviationWeatherClient implements AviationDataProvider {
       @Qualifier(AeroLinkConstants.PROVIDER_RATE_LIMITER) Bucket rateLimiterBucket,
       @Qualifier(AeroLinkConstants.PROVIDER_RETRY) RetryTemplate retryTemplate,
       @Qualifier(AeroLinkConstants.PROVIDER_CIRCUIT_BREAKER)
-          CircuitBreaker aviationWeatherCircuitBreaker) {
+          CircuitBreaker aviationWeatherCircuitBreaker,
+      AeroLinkMetrics metrics) {
     this.restClient = aviationWeatherRestClient;
     this.rateLimiterBucket = rateLimiterBucket;
     this.retryTemplate = retryTemplate;
     this.circuitBreaker = aviationWeatherCircuitBreaker;
+    this.metrics = metrics;
   }
 
   /**
@@ -75,6 +79,7 @@ public class AviationWeatherClient implements AviationDataProvider {
     if (!probe.isConsumed()) {
       long retryAfterSeconds = probe.getNanosToWaitForRefill() / NANOS_PER_SECOND;
       log.warn("Aviation Weather API rate limit reached. Retry after {}s", retryAfterSeconds);
+      metrics.recordRateLimitHit();
       throw new AeroLinkException(ErrorCode.UPSTREAM_RATE_LIMIT_EXCEEDED, retryAfterSeconds);
     }
 

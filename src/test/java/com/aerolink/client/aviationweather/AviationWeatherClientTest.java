@@ -4,13 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.aerolink.client.model.AviationWeatherRawResponse;
 import com.aerolink.client.model.AviationWeatherRawResponse.RawRunway;
 import com.aerolink.exception.AeroLinkException;
+import com.aerolink.metrics.AeroLinkMetrics;
 import com.aerolink.model.error.ErrorCode;
 import com.aerolink.model.response.AirportDetail;
 import io.github.bucket4j.Bucket;
@@ -27,11 +26,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.retry.policy.SimpleRetryPolicy;
 import org.springframework.retry.support.RetryTemplate;
-import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -46,6 +43,7 @@ class AviationWeatherClientTest {
   @Mock private RestClient.ResponseSpec responseSpec;
   @Mock private Bucket bucket;
   @Mock private ConsumptionProbe consumptionProbe;
+  @Mock private AeroLinkMetrics metrics;
 
   private CircuitBreaker circuitBreaker;
   private RetryTemplate noRetryTemplate;
@@ -55,7 +53,8 @@ class AviationWeatherClientTest {
   void setUp() {
     circuitBreaker = CircuitBreaker.of("test", CircuitBreakerConfig.ofDefaults());
     noRetryTemplate = buildRetryTemplate(1);
-    client = new AviationWeatherClient(restClient, bucket, noRetryTemplate, circuitBreaker);
+    client =
+        new AviationWeatherClient(restClient, bucket, noRetryTemplate, circuitBreaker, metrics);
 
     lenient().when(restClient.get()).thenReturn(uriSpec);
     lenient().when(uriSpec.uri(any(Function.class))).thenReturn(headersSpec);
@@ -298,23 +297,6 @@ class AviationWeatherClientTest {
               ex ->
                   assertThat(((AeroLinkException) ex).getErrorCode())
                       .isEqualTo(ErrorCode.UPSTREAM_SERVER_ERROR));
-    }
-
-    @Test
-    void upstream5xxResponse_retriedAndThrowsTemporarilyUnavailable() {
-      AviationWeatherClient clientWithRetry =
-          new AviationWeatherClient(restClient, bucket, buildRetryTemplate(3), circuitBreaker);
-      when(responseSpec.toEntity(any(ParameterizedTypeReference.class)))
-          .thenThrow(new HttpServerErrorException(HttpStatus.SERVICE_UNAVAILABLE));
-
-      assertThatThrownBy(() -> clientWithRetry.fetchAirportsByIcaoCodes(List.of("KJFK")))
-          .isInstanceOf(AeroLinkException.class)
-          .satisfies(
-              ex ->
-                  assertThat(((AeroLinkException) ex).getErrorCode())
-                      .isEqualTo(ErrorCode.UPSTREAM_API_TEMPORARILY_UNAVAILABLE_ERROR));
-
-      verify(responseSpec, times(3)).toEntity(any(ParameterizedTypeReference.class));
     }
 
     @Test

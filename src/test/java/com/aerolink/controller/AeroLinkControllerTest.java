@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.aerolink.exception.AeroLinkException;
+import com.aerolink.metrics.AeroLinkMetrics;
 import com.aerolink.model.error.ErrorCode;
 import com.aerolink.model.response.AirportDetail;
 import com.aerolink.model.response.AirportIdentifier;
@@ -36,6 +37,7 @@ class AeroLinkControllerTest {
   @Autowired private MockMvc mockMvc;
 
   @MockitoBean private AeroLinkService aeroLinkService;
+  @MockitoBean private AeroLinkMetrics metrics;
 
   // ─────────────────────────────────────────────
   // Happy Path

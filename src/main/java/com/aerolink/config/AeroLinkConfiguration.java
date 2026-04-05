@@ -116,7 +116,8 @@ public class AeroLinkConfiguration {
   }
 
   @Bean(name = AeroLinkConstants.PROVIDER_RATE_LIMITER)
-  public Bucket rateLimiterBucket(AviationProviderProperties properties, MeterRegistry meterRegistry) {
+  public Bucket rateLimiterBucket(
+      AviationProviderProperties properties, MeterRegistry meterRegistry) {
     Bandwidth limit =
         Bandwidth.builder()
             .capacity(properties.requestLimitPerMinute())

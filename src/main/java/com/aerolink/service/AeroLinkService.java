@@ -2,7 +2,10 @@ package com.aerolink.service;
 
 import com.aerolink.client.AviationDataProvider;
 import com.aerolink.config.AviationDataProviderRegistry;
+import com.aerolink.exception.AeroLinkException;
+import com.aerolink.metrics.AeroLinkMetrics;
 import com.aerolink.model.response.AirportDetail;
+import io.micrometer.core.instrument.Timer;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,15 +22,18 @@ import org.springframework.stereotype.Service;
 @Service
 public class AeroLinkService {
 
-  private String activeProvider;
-  private AviationDataProvider aviationDataProvider;
+  private final String activeProvider;
+  private final AviationDataProvider aviationDataProvider;
+  private final AeroLinkMetrics metrics;
 
   public AeroLinkService(
       AviationDataProviderRegistry aviationDataProviderRegistry,
-      @Value("${aerolink.provider}") String activeProvider) {
+      @Value("${aerolink.provider}") String activeProvider,
+      AeroLinkMetrics metrics) {
     this.activeProvider = activeProvider;
     this.aviationDataProvider =
         aviationDataProviderRegistry.getActiveProviderByName(activeProvider);
+    this.metrics = metrics;
   }
 
   /**
@@ -42,7 +48,23 @@ public class AeroLinkService {
         "Fetching airport details for {} ICAO code(s): {}",
         normalizedCodes.size(),
         normalizedCodes);
-    return aviationDataProvider.fetchAirportsByIcaoCodes(normalizedCodes);
+
+    metrics.recordIcaoCodesRequested(normalizedCodes.size());
+    Timer.Sample sample = metrics.startLookupTimer();
+
+    try {
+      List<AirportDetail> results = aviationDataProvider.fetchAirportsByIcaoCodes(normalizedCodes);
+
+      String outcome = results.isEmpty() ? "empty" : "success";
+      metrics.recordLookupRequest(outcome);
+      metrics.recordAirportsReturned(results.size());
+      metrics.stopLookupTimer(sample, outcome);
+      return results;
+    } catch (AeroLinkException ex) {
+      metrics.recordLookupRequest("error");
+      metrics.stopLookupTimer(sample, "error");
+      throw ex;
+    }
   }
 
   /**
