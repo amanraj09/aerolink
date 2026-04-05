@@ -22,6 +22,89 @@ Aerolink is a Spring Boot application acting as an API wrapper for aviation-rela
 
 ---
 
+## 🏛️ Architecture Overview
+
+### Layered Design
+
+The application follows a clean layered architecture with strict separation of concerns:
+
+```
+ HTTP Request
+      │
+      ▼
+┌─────────────────────┐
+│   AeroLinkController │  ← Input validation, HTTP mapping
+└─────────┬───────────┘
+          │
+          ▼
+┌─────────────────────┐
+│   AeroLinkService    │  ← Business logic, ICAO normalisation
+└─────────┬───────────┘
+          │
+          ▼
+┌──────────────────────────┐
+│  AviationDataProvider    │  ← Provider interface (Strategy pattern)
+│  (AviationWeatherClient) │  ← Rate limit → Circuit Breaker → Retry → HTTP
+└──────────────────────────┘
+          │
+          ▼
+   AviationWeather.gov API
+```
+
+### Design Patterns
+
+| Pattern | Where | Purpose |
+|---------|-------|---------|
+| **Plugin** | `AviationDataProvider` interface + `AviationWeatherClient` | Decouples service from any specific upstream vendor — the active provider is resolved once at startup from config (`aerolink.provider`); adding a new provider requires only a new implementation and a config change, no business logic changes |
+| **Registry** | `AviationDataProviderRegistry` | Holds all registered `AviationDataProvider` implementations keyed by provider name; acts as a lookup table for config-driven provider resolution at startup |
+| **AOP / Decorator** | `@TrackMetrics` + `MetricTrackingAspect` | Cross-cutting metrics collection applied declaratively — no metrics code in business logic |
+| **Retry** | `RetryTemplate` in `AviationWeatherClient` | Automatically re-attempts failed upstream calls with exponential backoff — only for transient failures (502, 503, network errors) where retrying is meaningful |
+| **Circuit Breaker** | `CircuitBreaker` wrapping upstream calls | Tracks upstream failure rate over a sliding window; short-circuits all calls when the threshold is breached, giving the upstream time to recover and preventing thread exhaustion |
+
+---
+
+### Resiliency & Fault Tolerance
+
+Every upstream call passes through three layers of protection in order: `Rate Limiter → Circuit Breaker → Retry`
+
+- **Rate Limiter** — 60 req/min token bucket; rejected requests get an immediate `AERO-104` response with a `Retry-After` header, no threads held
+- **Circuit Breaker** — opens after 20% failure rate over a 10-call window; recovers via half-open probe (3 calls) after 10s
+- **Retry** — up to 3 attempts with exponential backoff (200ms, 400ms, 800ms); only for transient errors (502, 503, network failures) — deterministic failures like 500 are never retried
+
+---
+
+### Observability
+
+- **Prometheus Metrics** — custom business metrics eagerly pre-registered at startup; circuit breaker state, HTTP client and server metrics all exported out of the box
+- **Custom Business Metrics** — lookup counts, latency, error rates, and rate limit hits tracked per provider and outcome (`success` / `empty` / `error`)
+- **Health & Info** — `/status` exposes application liveness; `/info` surfaces dependency versions and build metadata via Spring Boot Actuator
+
+---
+
+### Error Handling
+
+- **Typed error codes** — all failures map to a named `ErrorCode` (`AERO-1xx` for client errors, `AERO-2xx` for upstream errors) carried by a single `AeroLinkException`
+- **Centralised response shaping** — `GlobalExceptionHandler` translates every error code to the correct HTTP status and a consistent `{ errorCode, message }` body; no error logic scattered across layers
+- **Exception hierarchy drives resilience decisions** — `UpstreamTransientServerException` (502/503) extends `UpstreamServerException` (500), letting the circuit breaker and retry policy each act independently on the same exception without coupling
+
+---
+
+### Architecture Decisions & Assumptions
+
+- **Provider abstraction** — `AviationDataProvider` is an interface even though only one implementation exists today. The active provider is resolved at startup from `aerolink.provider` config via `AviationDataProviderRegistry`. Adding a second provider (e.g. FlightAware) requires only a new `@Component` implementing the interface and a config change — no business logic changes.
+
+- **500 is not retried** — A 500 indicates a server-side bug. Retrying the identical request against the same endpoint will produce the same result. Only transient conditions (502, 503, network failures) are retried.
+
+- **Circuit breaker ignores business exceptions** — Validation errors (bad ICAO format, too many codes) and rate limit hits are application-level outcomes, not upstream instability signals. Including them in the failure rate would cause the circuit to open under legitimate client-side load.
+
+- **Separate management port (8081)** — Prometheus, health, and info endpoints are internal operational tooling. Binding them to a dedicated port allows them to be firewalled at the infrastructure level without any application-level authentication logic.
+
+- **Resilience at the client layer, not the service layer** — Retry and Circuit Breaker live inside `AviationWeatherClient`, not `AeroLinkService`. Resilience is a transport concern — it deals with HTTP status codes, network failures, and upstream behaviour that the service layer has no business knowing about. Placing it at the client boundary keeps business logic clean and makes resilience behaviour easy to reason about and test in isolation.
+
+- **Mapping at the client boundary** — `AviationWeatherClient` maps the raw upstream response to provider-agnostic domain models (`AirportDetail`, `RunwayDetail`, etc.) before returning. The service layer never sees the upstream schema. If the upstream API changes, only the client mapping needs updating.
+
+---
+
 ## ⚙️ Setup & Run
 
 ### Prerequisites
@@ -68,25 +151,6 @@ java -jar target/aerolink-1.0.0-SNAPSHOT.jar
 
 The API starts on port **8080** and the management/metrics server on port **8081**.
 
-### Configuration
-
-All configuration lives in `src/main/resources/application.properties`. Key properties you may want to override:
-
-| Property | Default | Description |
-|----------|---------|-------------|
-| `aviation.provider.api.base-url` | `https://aviationweather.gov/api/data` | Upstream API base URL |
-| `aviation.provider.api.connect-timeout` | `5s` | Connection timeout |
-| `aviation.provider.api.read-timeout` | `10s` | Read timeout |
-| `aviation.provider.api.max-total-connections` | `50` | HTTP connection pool size |
-| `aviation.provider.api.max-connections-per-route` | `20` | Max connections per route |
-| `aviation.provider.api.request-limit-per-minute` | `60` | Rate limit (requests/min) |
-
-Override at runtime with system properties:
-```bash
-java -jar target/aerolink-1.0.0-SNAPSHOT.jar \
-  --aviation.provider.api.request-limit-per-minute=120 \
-  --aviation.provider.api.read-timeout=15s
-```
 
 ---
 
@@ -116,6 +180,18 @@ curl "http://localhost:8080/api/v1/airport?icaoCodes=KLAX,KSFO"
 ### Monitoring
 
 - **Metrics (Prometheus)**: `http://localhost:8081/prometheus`
+
+#### Key Metrics
+
+| Prometheus Metric | Type | Description |
+|-------------------|------|-------------|
+| `aerolink_airport_lookups_total` | Counter | Lookup requests by `outcome` (`success` / `empty` / `error`) |
+| `aerolink_airport_lookup_duration_seconds` | Timer | End-to-end lookup latency by `outcome` |
+| `aerolink_errors_total` | Counter | Application errors by `error_code` and `error_type` |
+| `aerolink_upstream_rate_limit_hits_total` | Counter | Requests blocked by the upstream API rate limit |
+| `resilience4j_circuitbreaker_state` | Gauge | Circuit breaker state — `0` closed, `1` open, `2` half-open |
+| `resilience4j_circuitbreaker_failure_rate` | Gauge | Failure rate (%) within the sliding window |
+| `http_server_requests_seconds` | Timer | Inbound HTTP request count and latency by endpoint and status |
 
 > [!IMPORTANT]
 > **Why are `/status`, `/info`, and `/prometheus` on port 8081 instead of 8080?**
