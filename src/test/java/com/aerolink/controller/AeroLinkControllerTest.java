@@ -11,7 +11,6 @@ import com.aerolink.model.response.AirportIdentifier;
 import com.aerolink.service.AeroLinkService;
 import com.aerolink.util.RequestValidator;
 import java.util.List;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -43,7 +42,6 @@ class AeroLinkControllerTest {
   // ─────────────────────────────────────────────
 
   @Test
-  @DisplayName("GET /airport - returns 200 with airport details for a single ICAO code")
   void getAirportDetails_singleIcaoCode_returns200() throws Exception {
     AirportDetail detail = buildMockAirportDetail("KJFK", "John F Kennedy Intl");
     when(aeroLinkService.getAirportDetails(List.of("KJFK"))).thenReturn(List.of(detail));
@@ -58,7 +56,6 @@ class AeroLinkControllerTest {
   }
 
   @Test
-  @DisplayName("GET /airport - returns 200 with details for multiple ICAO codes")
   void getAirportDetails_multipleIcaoCodes_returns200() throws Exception {
     List<String> icaoCodes = List.of("KJFK", "KLAX", "KORD");
     List<AirportDetail> details =
@@ -83,7 +80,6 @@ class AeroLinkControllerTest {
   }
 
   @Test
-  @DisplayName("GET /airport - returns 200 with exactly 15 ICAO codes (boundary max)")
   void getAirportDetails_exactly15IcaoCodes_returns200() throws Exception {
     List<String> icaoCodes =
         List.of(
@@ -118,7 +114,6 @@ class AeroLinkControllerTest {
   }
 
   @Test
-  @DisplayName("GET /airport - returns empty list when service returns no matches")
   void getAirportDetails_noMatchesFound_returns200WithEmptyList() throws Exception {
     when(aeroLinkService.getAirportDetails(List.of("XXXX"))).thenReturn(List.of());
 
@@ -133,7 +128,6 @@ class AeroLinkControllerTest {
   // ─────────────────────────────────────────────
 
   @Test
-  @DisplayName("GET /airport - returns 400 when more than 15 ICAO codes are provided")
   void getAirportDetails_over15IcaoCodes_returns400() throws Exception {
     mockMvc
         .perform(
@@ -164,7 +158,6 @@ class AeroLinkControllerTest {
   }
 
   @Test
-  @DisplayName("GET /airport - returns 400 error body with correct message when limit exceeded")
   void getAirportDetails_over15IcaoCodes_returnsCorrectErrorBody() throws Exception {
     mockMvc
         .perform(
@@ -194,7 +187,6 @@ class AeroLinkControllerTest {
   }
 
   @Test
-  @DisplayName("GET /airport - returns 400 with AERO-103 when ICAO code has invalid format")
   void getAirportDetails_invalidIcaoFormat_returns400() throws Exception {
     mockMvc
         .perform(get(BASE_URL).param("icaoCodes", "KJF1").contentType(MediaType.APPLICATION_JSON))
@@ -207,7 +199,6 @@ class AeroLinkControllerTest {
   }
 
   @Test
-  @DisplayName("GET /airport - returns 429 when service throws RATE_LIMIT_EXCEEDED")
   void getAirportDetails_rateLimitExceeded_returns429() throws Exception {
     when(aeroLinkService.getAirportDetails(any()))
         .thenThrow(new AeroLinkException(ErrorCode.UPSTREAM_RATE_LIMIT_EXCEEDED));

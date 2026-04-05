@@ -10,7 +10,6 @@ import com.aerolink.model.response.AirportDetail;
 import com.aerolink.model.response.AirportIdentifier;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,11 +40,9 @@ class AeroLinkServiceTest {
   // ─────────────────────────────────────────────
 
   @Nested
-  @DisplayName("ICAO code normalization to uppercase")
   class Normalization {
 
     @Test
-    @DisplayName("normalizes lowercase codes to uppercase before upstream call")
     void getAirportDetails_lowercaseCodes_normalizedToUppercase() {
       when(aviationDataProvider.fetchAirportsByIcaoCodes(List.of("KJFK", "LFPG")))
           .thenReturn(List.of());
@@ -56,7 +53,6 @@ class AeroLinkServiceTest {
     }
 
     @Test
-    @DisplayName("normalizes mixed case codes to uppercase before upstream call")
     void getAirportDetails_mixedCaseCodes_normalizedToUppercase() {
       when(aviationDataProvider.fetchAirportsByIcaoCodes(List.of("KJFK"))).thenReturn(List.of());
 
@@ -66,7 +62,6 @@ class AeroLinkServiceTest {
     }
 
     @Test
-    @DisplayName("passes already uppercase codes to upstream unchanged")
     void getAirportDetails_uppercaseCodes_passedUnchanged() {
       when(aviationDataProvider.fetchAirportsByIcaoCodes(List.of("KJFK", "LFPG")))
           .thenReturn(List.of());
@@ -77,7 +72,6 @@ class AeroLinkServiceTest {
     }
 
     @Test
-    @DisplayName("normalizes all codes in a multi-code list with various casing")
     void getAirportDetails_multipleCodesVariousCases_allNormalized() {
       List<String> expected = List.of("KJFK", "LFPG", "EGLL");
       when(aviationDataProvider.fetchAirportsByIcaoCodes(expected)).thenReturn(List.of());
@@ -93,11 +87,9 @@ class AeroLinkServiceTest {
   // ─────────────────────────────────────────────
 
   @Nested
-  @DisplayName("Return value from provider")
   class ReturnValue {
 
     @Test
-    @DisplayName("returns airport details received from upstream provider")
     void getAirportDetails_returnsProviderResult() {
       AirportDetail mockDetail = buildMockAirportDetail("KJFK", "John F Kennedy Intl");
       when(aviationDataProvider.fetchAirportsByIcaoCodes(List.of("KJFK")))
@@ -109,7 +101,6 @@ class AeroLinkServiceTest {
     }
 
     @Test
-    @DisplayName("returns empty list when provider finds no matches")
     void getAirportDetails_noMatchFound_returnsEmptyList() {
       when(aviationDataProvider.fetchAirportsByIcaoCodes(List.of("ZZZZ"))).thenReturn(List.of());
 

@@ -101,7 +101,7 @@ public class AviationWeatherClient implements AviationDataProvider {
                                 HttpStatusCode::is4xxClientError,
                                 (request, apiResponse) -> {
                                   log.error(
-                                      "Aviation Weather API returned HTTP {} for IDs: {} — not retrying",
+                                      "Aviation Weather API returned HTTP {} for IDs: {} — will not retry",
                                       apiResponse.getStatusCode().value(),
                                       ids);
                                   throw new AeroLinkException(ErrorCode.UPSTREAM_CLIENT_ERROR);
@@ -110,7 +110,7 @@ public class AviationWeatherClient implements AviationDataProvider {
                                 status -> status.value() == 500,
                                 (request, apiResponse) -> {
                                   log.error(
-                                      "Aviation Weather API returned HTTP 500 for IDs: {} — not retrying",
+                                      "Aviation Weather API returned HTTP 500 for IDs: {} — will not retry",
                                       ids);
                                   throw new AeroLinkException(ErrorCode.UPSTREAM_SERVER_ERROR);
                                 })
@@ -137,6 +137,9 @@ public class AviationWeatherClient implements AviationDataProvider {
                   context -> {
                     log.error(
                         "All {} attempt(s) exhausted for IDs: {}", context.getRetryCount(), ids);
+                    if (context.getLastThrowable() instanceof AeroLinkException ex) {
+                      throw ex;
+                    }
                     throw new AeroLinkException(
                         ErrorCode.UPSTREAM_API_TEMPORARILY_UNAVAILABLE_ERROR);
                   }));

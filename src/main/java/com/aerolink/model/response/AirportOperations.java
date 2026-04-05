@@ -8,7 +8,7 @@ package com.aerolink.model.response;
  * @param beacon Indicates presence of an airport beacon
  * @param services Available services indicator
  * @param operations Operational status code of the airport
- * @param passengers Annual passenger count
+ * @param passengerCount Annual passenger count
  */
 public record AirportOperations(
     String owner,
@@ -16,4 +16,4 @@ public record AirportOperations(
     String beacon,
     String services,
     String operations,
-    String passengers) {}
+    String passengerCount) {}
