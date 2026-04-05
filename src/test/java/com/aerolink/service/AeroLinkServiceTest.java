@@ -13,10 +13,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class AeroLinkServiceTest {
@@ -26,13 +24,13 @@ class AeroLinkServiceTest {
   @Mock private AviationDataProviderRegistry aviationDataProviderRegistry;
   @Mock private AviationDataProvider aviationDataProvider;
 
-  @InjectMocks private AeroLinkService aeroLinkService;
+  private AeroLinkService aeroLinkService;
 
   @BeforeEach
   void setUp() {
-    ReflectionTestUtils.setField(aeroLinkService, "activeProvider", ACTIVE_PROVIDER);
     when(aviationDataProviderRegistry.getActiveProviderByName(ACTIVE_PROVIDER))
         .thenReturn(aviationDataProvider);
+    aeroLinkService = new AeroLinkService(aviationDataProviderRegistry, ACTIVE_PROVIDER);
   }
 
   // ─────────────────────────────────────────────

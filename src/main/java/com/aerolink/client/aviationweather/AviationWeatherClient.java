@@ -37,9 +37,9 @@ import org.springframework.web.client.RestClientException;
 @Component
 public class AviationWeatherClient implements AviationDataProvider {
 
-  private final static String AIRPORT_PATH = "/airport";
-  private final static int NANOS_PER_SECOND = 1000000000;
-  private final static String PROVIDER_NAME = "aviationWeather";
+  private static final String AIRPORT_PATH = "/airport";
+  private static final int NANOS_PER_SECOND = 1000000000;
+  private static final String PROVIDER_NAME = "aviationWeather";
 
   private final RestClient restClient;
   private final Bucket rateLimiterBucket;

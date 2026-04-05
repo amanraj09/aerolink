@@ -19,7 +19,7 @@ public enum ErrorCode {
   ICAO_CODE_INVALID_FORMAT("AERO-103", "", HttpStatus.BAD_REQUEST),
   UPSTREAM_RATE_LIMIT_EXCEEDED(
       "AERO-104",
-      "Too many requests. Upstream aviation API applied Rate limit of 60 requests per minute exceeded",
+      "Too many requests. Upstream aviation API applied Rate limit",
       HttpStatus.TOO_MANY_REQUESTS),
 
   // 5xx http status

@@ -9,27 +9,25 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
- * Service layer containing business logic for retrieving and transforming
- * airport data.
+ * Service layer containing business logic for retrieving and transforming airport data.
  *
- * <p>
- * Acts as the intermediary between the controller and the external aviation
- * data provider.
- * Delegates the upstream API call to {@link AviationDataProvider}, keeping the
- * service decoupled
+ * <p>Acts as the intermediary between the controller and the external aviation data provider.
+ * Delegates the upstream API call to {@link AviationDataProvider}, keeping the service decoupled
  * from any specific provider implementation.
  */
 @Slf4j
 @Service
 public class AeroLinkService {
 
-  private final AviationDataProviderRegistry aviationDataProviderRegistry;
-
-  @Value("${aerolink.provider}")
   private String activeProvider;
+  private AviationDataProvider aviationDataProvider;
 
-  public AeroLinkService(AviationDataProviderRegistry aviationDataProviderRegistry) {
-    this.aviationDataProviderRegistry = aviationDataProviderRegistry;
+  public AeroLinkService(
+      AviationDataProviderRegistry aviationDataProviderRegistry,
+      @Value("${aerolink.provider}") String activeProvider) {
+    this.activeProvider = activeProvider;
+    this.aviationDataProvider =
+        aviationDataProviderRegistry.getActiveProviderByName(activeProvider);
   }
 
   /**
@@ -44,14 +42,11 @@ public class AeroLinkService {
         "Fetching airport details for {} ICAO code(s): {}",
         normalizedCodes.size(),
         normalizedCodes);
-    return aviationDataProviderRegistry
-        .getActiveProviderByName(activeProvider)
-        .fetchAirportsByIcaoCodes(normalizedCodes);
+    return aviationDataProvider.fetchAirportsByIcaoCodes(normalizedCodes);
   }
 
   /**
-   * Normalizes ICAO codes to uppercase. Ensures consistent format before passing
-   * to the upstream
+   * Normalizes ICAO codes to uppercase. Ensures consistent format before passing to the upstream
    * API,
    *
    * @param icaoCodes raw ICAO codes from the request
