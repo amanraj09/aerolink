@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import com.aerolink.client.model.AviationWeatherRawResponse;
 import com.aerolink.client.model.AviationWeatherRawResponse.RawRunway;
 import com.aerolink.exception.AeroLinkException;
+import com.aerolink.exception.UpstreamServerException;
 import com.aerolink.metrics.AeroLinkMetrics;
 import com.aerolink.model.error.ErrorCode;
 import com.aerolink.model.response.AirportDetail;
@@ -289,7 +290,7 @@ class AviationWeatherClientTest {
     @Test
     void upstream500Response_throwsUpstreamServerError() {
       when(responseSpec.toEntity(any(ParameterizedTypeReference.class)))
-          .thenThrow(new AeroLinkException(ErrorCode.UPSTREAM_SERVER_ERROR));
+          .thenThrow(new UpstreamServerException(500));
 
       assertThatThrownBy(() -> client.fetchAirportsByIcaoCodes(List.of("KJFK")))
           .isInstanceOf(AeroLinkException.class)

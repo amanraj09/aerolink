@@ -2,10 +2,13 @@ package com.aerolink.config;
 
 import com.aerolink.constant.AeroLinkConstants;
 import com.aerolink.exception.AeroLinkException;
+import com.aerolink.exception.UpstreamServerException;
+import com.aerolink.exception.UpstreamTransientServerException;
 import com.aerolink.properties.AviationProviderProperties;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.micrometer.tagged.TaggedCircuitBreakerMetrics;
 import io.micrometer.core.instrument.Gauge;
@@ -28,8 +31,8 @@ import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.retry.backoff.ExponentialBackOffPolicy;
 import org.springframework.retry.policy.SimpleRetryPolicy;
 import org.springframework.retry.support.RetryTemplate;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
 
 @Slf4j
 @Configuration
@@ -83,7 +86,12 @@ public class AeroLinkConfiguration {
     backOffPolicy.setMultiplier(BACKOFF_MULTIPLIER);
 
     SimpleRetryPolicy retryPolicy =
-        new SimpleRetryPolicy(MAX_ATTEMPTS, Map.of(RestClientException.class, true));
+        new SimpleRetryPolicy(
+            MAX_ATTEMPTS,
+            Map.of(
+                UpstreamTransientServerException.class, true, // retry on 502/503
+                ResourceAccessException.class, true // retry on network drop/timeout
+                ));
 
     RetryTemplate template = new RetryTemplate();
     template.setBackOffPolicy(backOffPolicy);
@@ -94,19 +102,20 @@ public class AeroLinkConfiguration {
   // ─── Circuit Breaker ──────────────────────────────────────────────────────
 
   private static final int SLIDING_WINDOW_SIZE = 10;
-  private static final float FAILURE_RATE_THRESHOLD = 50.0f;
+  private static final float FAILURE_RATE_THRESHOLD = 20.0f;
   private static final int WAIT_DURATION_OPEN_SECONDS = 10;
   private static final int HALF_OPEN_PERMITTED_CALLS = 3;
 
   @Bean(name = AeroLinkConstants.PROVIDER_CIRCUIT_BREAKER)
   public CircuitBreaker circuitBreaker(MeterRegistry meterRegistry) {
-    io.github.resilience4j.circuitbreaker.CircuitBreakerConfig config =
+    CircuitBreakerConfig config =
         io.github.resilience4j.circuitbreaker.CircuitBreakerConfig.custom()
             .slidingWindowSize(SLIDING_WINDOW_SIZE)
+            .minimumNumberOfCalls(SLIDING_WINDOW_SIZE)
             .failureRateThreshold(FAILURE_RATE_THRESHOLD)
             .waitDurationInOpenState(Duration.ofSeconds(WAIT_DURATION_OPEN_SECONDS))
             .permittedNumberOfCallsInHalfOpenState(HALF_OPEN_PERMITTED_CALLS)
-            .recordExceptions(RestClientException.class)
+            .recordExceptions(UpstreamServerException.class, ResourceAccessException.class)
             .ignoreExceptions(AeroLinkException.class)
             .build();
 

@@ -4,6 +4,8 @@ import com.aerolink.client.AviationDataProvider;
 import com.aerolink.client.model.AviationWeatherRawResponse;
 import com.aerolink.constant.AeroLinkConstants;
 import com.aerolink.exception.AeroLinkException;
+import com.aerolink.exception.UpstreamServerException;
+import com.aerolink.exception.UpstreamTransientServerException;
 import com.aerolink.metrics.AeroLinkMetrics;
 import com.aerolink.model.error.ErrorCode;
 import com.aerolink.model.response.AirportCommunications;
@@ -28,7 +30,6 @@ import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
-import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -111,8 +112,8 @@ public class AviationWeatherClient implements AviationDataProvider {
                                 HttpStatusCode::is4xxClientError,
                                 (request, apiResponse) -> handle4xxClientError(ids, apiResponse))
                             .onStatus(
-                                status -> status.value() == 500,
-                                (request, apiResponse) -> handle500ServerError(ids, apiResponse))
+                                HttpStatusCode::is5xxServerError,
+                                (request, apiResponse) -> handle5xxServerError(ids, apiResponse))
                             .toEntity(new ParameterizedTypeReference<>() {});
 
                     HttpStatusCode statusCode = response.getStatusCode();
@@ -136,9 +137,8 @@ public class AviationWeatherClient implements AviationDataProvider {
                   context -> {
                     log.error(
                         "All {} attempt(s) exhausted for IDs: {}", context.getRetryCount(), ids);
-                    if (context.getLastThrowable() instanceof AeroLinkException ex) {
-                      throw ex;
-                    }
+                    Throwable t = context.getLastThrowable();
+                    if (t instanceof RuntimeException ex) throw ex;
                     throw new AeroLinkException(
                         ErrorCode.UPSTREAM_API_TEMPORARILY_UNAVAILABLE_ERROR);
                   }));
@@ -153,23 +153,36 @@ public class AviationWeatherClient implements AviationDataProvider {
   }
 
   private AeroLinkException handleUpstreamException(Exception ex, String ids) {
-    if (ex instanceof CallNotPermittedException) {
-      log.error("Circuit breaker is OPEN — upstream calls blocked for IDs: {}", ids);
-      return new AeroLinkException(ErrorCode.UPSTREAM_API_TEMPORARILY_UNAVAILABLE_ERROR);
+    return switch (ex) {
+      case CallNotPermittedException e -> {
+        log.error("Circuit breaker is OPEN — upstream calls blocked for IDs: {}", ids);
+        yield new AeroLinkException(ErrorCode.UPSTREAM_API_TEMPORARILY_UNAVAILABLE_ERROR);
+      }
+      case UpstreamServerException e -> {
+        log.error("Upstream returned HTTP {} for IDs: {}", e.getHttpStatus(), ids);
+        yield new AeroLinkException(ErrorCode.UPSTREAM_SERVER_ERROR);
+      }
+      case ResourceAccessException e -> {
+        log.error("Network failure reaching upstream for IDs: {}", ids);
+        yield new AeroLinkException(ErrorCode.UPSTREAM_API_TEMPORARILY_UNAVAILABLE_ERROR);
+      }
+      default -> {
+        log.error("Upstream communication error for IDs: {} — {}", ids, ex.getMessage());
+        yield new AeroLinkException(ErrorCode.UPSTREAM_RESPONSE_PARSE_ERROR);
+      }
+    };
+  }
+
+  private void handle5xxServerError(String ids, ClientHttpResponse response) throws IOException {
+    int status = response.getStatusCode().value();
+    log.error(
+        "Upstream returned HTTP {} for IDs: {} — counting toward circuit breaker", status, ids);
+    // 502/503 are transient errors. gateway hiccup or overload, worth retrying.
+    // 500 is a server-side bug. retrying the same request won't help.
+    if (status == 502 || status == 503) {
+      throw new UpstreamTransientServerException(status);
     }
-    if (ex instanceof HttpServerErrorException e) {
-      log.error(
-          "Upstream returned HTTP {} for IDs: {} — retries exhausted",
-          e.getStatusCode().value(),
-          ids);
-      return new AeroLinkException(ErrorCode.UPSTREAM_API_TEMPORARILY_UNAVAILABLE_ERROR);
-    }
-    if (ex instanceof ResourceAccessException) {
-      log.error("Network failure reaching upstream for IDs: {}", ids);
-      return new AeroLinkException(ErrorCode.UPSTREAM_SERVER_ERROR);
-    }
-    log.error("Upstream communication error for IDs: {} — {}", ids, ex.getMessage());
-    return new AeroLinkException(ErrorCode.UPSTREAM_RESPONSE_PARSE_ERROR);
+    throw new UpstreamServerException(status);
   }
 
   private void handle429RateLimit(String ids, ClientHttpResponse response) throws IOException {
@@ -192,11 +205,6 @@ public class AviationWeatherClient implements AviationDataProvider {
         response.getStatusCode().value(),
         ids);
     throw new AeroLinkException(ErrorCode.UPSTREAM_CLIENT_ERROR);
-  }
-
-  private void handle500ServerError(String ids, ClientHttpResponse response) {
-    log.error("Aviation Weather API returned HTTP 500 for IDs: {} — will not retry", ids);
-    throw new AeroLinkException(ErrorCode.UPSTREAM_SERVER_ERROR);
   }
 
   /**
