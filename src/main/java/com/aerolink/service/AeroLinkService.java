@@ -11,18 +11,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-/**
- * Service layer containing business logic for retrieving and transforming airport data.
- *
- * <p>Acts as the intermediary between the controller and the external aviation data provider.
- * Delegates the upstream API call to {@link AviationDataProvider}, keeping the service decoupled
- * from any specific provider implementation.
- */
+/** Service layer containing business logic for retrieving and transforming airport data. */
 @Slf4j
 @Service
 public class AeroLinkService {
 
-  private final String activeProvider;
   private final AviationDataProvider aviationDataProvider;
   private final AeroLinkMetrics metrics;
 
@@ -30,7 +23,6 @@ public class AeroLinkService {
       AviationDataProviderRegistry aviationDataProviderRegistry,
       @Value("${aerolink.provider}") String activeProvider,
       AeroLinkMetrics metrics) {
-    this.activeProvider = activeProvider;
     this.aviationDataProvider =
         aviationDataProviderRegistry.getActiveProviderByName(activeProvider);
     this.metrics = metrics;

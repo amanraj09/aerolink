@@ -38,12 +38,11 @@ public class AeroLinkController {
   @GetMapping("/airport")
   public ResponseEntity<List<AirportDetail>> getAirportDetails(
       @RequestParam List<String> icaoCodes) {
+    requestValidator.validateAirportDetailsRequest(icaoCodes);
     log.info(
         "Received request for {} ICAO code(s): {}",
         icaoCodes == null ? 0 : icaoCodes.size(),
         icaoCodes);
-
-    requestValidator.validateAirportDetailsRequest(icaoCodes);
 
     List<AirportDetail> airportDetails = aeroLinkService.getAirportDetails(icaoCodes);
     log.info("Successfully returned airport details for {} ICAO code(s)", icaoCodes.size());
