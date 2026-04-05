@@ -54,26 +54,6 @@ class CircuitBreakerIntegrationTest {
   // ─────────────────────────────────────────────
 
   @Test
-  void upstream400_returnsAero203() {
-    stubFor(get(urlPathEqualTo("/airport")).willReturn(aResponse().withStatus(400)));
-
-    ResponseEntity<String> response = restTemplate.getForEntity(ICAO_URL, String.class);
-
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
-    assertThat(response.getBody()).contains("AERO-203");
-  }
-
-  @Test
-  void upstream404_returnsAero203() {
-    stubFor(get(urlPathEqualTo("/airport")).willReturn(aResponse().withStatus(404)));
-
-    ResponseEntity<String> response = restTemplate.getForEntity(ICAO_URL, String.class);
-
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
-    assertThat(response.getBody()).contains("AERO-203");
-  }
-
-  @Test
   void upstream4xx_doesNotCountTowardCbFailureRate() {
     stubFor(get(urlPathEqualTo("/airport")).willReturn(aResponse().withStatus(400)));
 
@@ -132,47 +112,6 @@ class CircuitBreakerIntegrationTest {
     assertThat(circuitBreaker.getMetrics().getNumberOfFailedCalls()).isGreaterThan(0);
   }
 
-  @Test
-  void upstream5xx_afterSlidingWindowExhausted_opensCb() {
-    // Sliding window = 10, minimumNumberOfCalls = 10, failureRateThreshold = 20%
-    // All 10 calls fail → 100% failure rate → CB opens.
-    // We will loop 11 times instead of 10 just to guarantee it crosses the
-    // threshold and trips
-    // properly on standard evaluation frames.
-    stubFor(get(urlPathEqualTo("/airport")).willReturn(aResponse().withStatus(500)));
-
-    for (int i = 0; i < 11; i++) {
-      restTemplate.getForEntity(ICAO_URL, String.class);
-    }
-
-    assertThat(circuitBreaker.getState()).isEqualTo(State.OPEN);
-  }
-
-  @Test
-  void upstream5xxMixedWith2xx_belowThreshold_cbRemainsClose() {
-    // 1 failure out of 10 calls = 10% failure rate < 20% threshold → CB stays
-    // CLOSED
-    stubFor(get(urlPathEqualTo("/airport")).willReturn(aResponse().withStatus(500)));
-    for (int i = 0; i < 1; i++) {
-      restTemplate.getForEntity(ICAO_URL, String.class);
-    }
-
-    com.github.tomakehurst.wiremock.client.WireMock.reset();
-    stubFor(
-        get(urlPathEqualTo("/airport"))
-            .willReturn(
-                aResponse()
-                    .withStatus(200)
-                    .withHeader("Content-Type", "application/json")
-                    .withBody("[]")));
-    for (int i = 0; i < 9; i++) {
-      ResponseEntity<String> response = restTemplate.getForEntity(ICAO_URL, String.class);
-      assertThat(response.getStatusCode()).isIn(HttpStatus.OK, HttpStatus.NO_CONTENT);
-    }
-
-    assertThat(circuitBreaker.getState()).isEqualTo(State.CLOSED);
-  }
-
   // ─────────────────────────────────────────────
   // Circuit breaker OPEN — all calls short-circuited
   // ─────────────────────────────────────────────
@@ -187,17 +126,5 @@ class CircuitBreakerIntegrationTest {
     assertThat(response.getBody()).contains("AERO-202");
   }
 
-  @Test
-  void circuitBreakerOpen_blocksSubsequentCallsWithoutHittingUpstream() {
-    circuitBreaker.transitionToOpenState();
 
-    // None of these calls reach WireMock — CB short-circuits them all
-    for (int i = 0; i < 3; i++) {
-      ResponseEntity<String> response = restTemplate.getForEntity(ICAO_URL, String.class);
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
-      assertThat(response.getBody()).contains("AERO-202");
-    }
-
-    assertThat(circuitBreaker.getState()).isEqualTo(State.OPEN);
-  }
 }

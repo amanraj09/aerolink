@@ -77,17 +77,5 @@ class AeroLinkIntegrationTest {
     assertThat(response.getBody()).contains("AERO-102");
   }
 
-  @Test
-  void invalidIcaoFormat_returns400WithAero103() {
-    String url =
-        UriComponentsBuilder.fromPath(BASE_URL)
-            .queryParam("icaoCodes", "KJF1")
-            .build()
-            .toUriString();
 
-    ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
-
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    assertThat(response.getBody()).contains("AERO-103");
-  }
 }

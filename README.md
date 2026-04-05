@@ -43,7 +43,7 @@ The application follows a clean layered architecture with strict separation of c
           │
           ▼
 ┌──────────────────────────┐
-│  AviationDataProvider    │  ← Provider interface (Strategy pattern)
+│  AviationDataProvider    │  ← Provider interface (Plugin pattern)
 │  (AviationWeatherClient) │  ← Rate limit → Circuit Breaker → Retry → HTTP
 └──────────────────────────┘
           │
@@ -67,7 +67,7 @@ The application follows a clean layered architecture with strict separation of c
 
 Every upstream call passes through three layers of protection in order: `Rate Limiter → Circuit Breaker → Retry`
 
-- **Rate Limiter** — 60 req/min token bucket; rejected requests get an immediate `AERO-104` response with a `Retry-After` header, no threads held
+- **Rate Limiter** — 60 req/min token bucket; rejected requests get an immediate error response with a `Retry-After` header, no threads held
 - **Circuit Breaker** — opens after 20% failure rate over a 10-call window; recovers via half-open probe (3 calls) after 10s
 - **Retry** — up to 3 attempts with exponential backoff (200ms, 400ms, 800ms); only for transient errors (502, 503, network failures) — deterministic failures like 500 are never retried
 
@@ -75,7 +75,7 @@ Every upstream call passes through three layers of protection in order: `Rate Li
 
 ### Observability
 
-- **Prometheus Metrics** — custom business metrics eagerly pre-registered at startup; circuit breaker state, HTTP client and server metrics all exported out of the box
+- **Prometheus Metrics** — Metrics : circuit breaker state, HTTP client and server metrics all exported out of the box
 - **Custom Business Metrics** — lookup counts, latency, error rates, and rate limit hits tracked per provider and outcome (`success` / `empty` / `error`)
 - **Health & Info** — `/status` exposes application liveness; `/info` surfaces dependency versions and build metadata via Spring Boot Actuator
 
@@ -119,7 +119,7 @@ mvn -version
 ### Clone & Build
 
 ```bash
-git clone https://github.com/your-org/aerolink.git
+git clone https://github.com/amanraj09/aerolink.git
 cd aerolink
 mvn clean install -DskipTests
 ```
@@ -133,7 +133,7 @@ mvn clean install -DskipTests
 mvn clean install
 ```
 
-### Run
+### Run Application
 
 **Option 1 — Maven plugin:**
 ```bash
@@ -170,12 +170,16 @@ curl "http://localhost:8080/api/v1/airport?icaoCodes=KLAX,KSFO"
 
 ### Health & Info
 
-- **Health Status**: `http://localhost:8081/status`
-- **App Info**: `http://localhost:8081/info`
+```bash
+curl http://localhost:8081/status
+curl http://localhost:8081/info
+```
 
 ### Monitoring
 
-- **Metrics (Prometheus)**: `http://localhost:8081/prometheus`
+```bash
+curl http://localhost:8081/prometheus
+```
 
 #### Key Metrics
 
@@ -202,6 +206,6 @@ Parts of this project were developed with the help of **Claude (Anthropic)** as 
 - **Unit test generation** — test cases for the client, service, and controller layers including edge cases and error scenarios
 - **Integration test generation** — WireMock-based circuit breaker integration tests covering 4xx, 5xx, and open circuit scenarios
 - **Configuration boilerplate** — setting up `RestClient`, `RetryTemplate`, `CircuitBreaker`, and Bucket4j with connection pooling and metrics binding
-- **README documentation** — architecture overview, design decisions, and API documentation
+- **README documentation** — Adding build, setup and run steps, API documentation
 
 All AI-generated code was reviewed, validated, and intentionally integrated. Core application logic, resilience design decisions, and architecture were human-driven.
