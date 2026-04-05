@@ -97,6 +97,8 @@ Every upstream call passes through three layers of protection in order: `Rate Li
 
 - **Resilience at the client layer, not the service layer** — Retry and Circuit Breaker live inside `AviationWeatherClient`, not `AeroLinkService`. Resilience is a transport concern — it deals with HTTP status codes, network failures, and upstream behaviour that the service layer has no business knowing about. Placing it at the client boundary keeps business logic clean and makes resilience behaviour easy to reason about and test in isolation.
 
+- **No fallback or cached response** — Aviation data is time-sensitive. Fields like radio frequencies, tower availability  can change and are operationally critical — a pilot or dispatch system acting on stale values is a real risk. Returning `AERO-202` and letting the caller decide is safer than silently serving outdated data.
+
 - **Mapping at the client boundary** — `AviationWeatherClient` maps the raw upstream response to provider-agnostic domain models (`AirportDetail`, `RunwayDetail`, etc.) before returning. The service layer never sees the upstream schema. If the upstream API changes, only the client mapping needs updating.
 
 ---
@@ -205,7 +207,7 @@ Parts of this project were developed with the help of **Claude (Anthropic)** as 
 
 - **Unit test generation** — test cases for the client, service, and controller layers
 - **Integration test generation** — WireMock-based circuit breaker integration tests covering 4xx, 5xx, and open circuit scenarios
-- **Configuration boilerplate** — setting up `RestClient`, `RetryTemplate`, `CircuitBreaker`, and Bucket4j with connection pooling and metrics binding
+- **Configuration boilerplate** — setting up `RestClient`, `RetryTemplate`, `CircuitBreaker` and metrics AOP. 
 - **README documentation** — Adding build, setup and run steps, API documentation
 
 All AI-generated code was reviewed, validated, and intentionally integrated. Core application logic, resilience design decisions, and architecture were human-driven.
