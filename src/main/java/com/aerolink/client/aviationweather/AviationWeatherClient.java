@@ -39,6 +39,7 @@ public class AviationWeatherClient implements AviationDataProvider {
 
   private final String AIRPORT_PATH = "/airport";
   private final int NANOS_PER_SECOND = 1000000000;
+  private final String PROVIDER_NAME = "aviationWeather";
 
   private final RestClient restClient;
   private final Bucket rateLimiterBucket;
@@ -142,6 +143,11 @@ public class AviationWeatherClient implements AviationDataProvider {
     } catch (RestClientException | CallNotPermittedException ex) {
       throw handleUpstreamException(ex, ids);
     }
+  }
+
+  @Override
+  public String getProviderName() {
+    return PROVIDER_NAME;
   }
 
   private AeroLinkException handleUpstreamException(Exception ex, String ids) {

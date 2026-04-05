@@ -16,4 +16,11 @@ public interface AviationDataProvider {
    * @return list of airport details, one per matched ICAO code
    */
   List<AirportDetail> fetchAirportsByIcaoCodes(List<String> icaoCodes);
+
+  /**
+   * Returns the unique identifier for this aviation data provider.
+   *
+   * @return provider name )
+   */
+  String getProviderName();
 }

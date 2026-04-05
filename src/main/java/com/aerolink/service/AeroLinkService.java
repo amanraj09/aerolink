@@ -1,9 +1,11 @@
 package com.aerolink.service;
 
 import com.aerolink.client.AviationDataProvider;
+import com.aerolink.config.AviationDataProviderRegistry;
 import com.aerolink.model.response.AirportDetail;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
@@ -17,10 +19,13 @@ import org.springframework.stereotype.Service;
 @Service
 public class AeroLinkService {
 
-  private final AviationDataProvider aviationDataProvider;
+  private final AviationDataProviderRegistry aviationDataProviderRegistry;
 
-  public AeroLinkService(AviationDataProvider aviationDataProvider) {
-    this.aviationDataProvider = aviationDataProvider;
+  @Value("${aerolink.provider}")
+  private String activeProvider;
+
+  public AeroLinkService(AviationDataProviderRegistry aviationDataProviderRegistry) {
+    this.aviationDataProviderRegistry = aviationDataProviderRegistry;
   }
 
   /**
@@ -35,7 +40,9 @@ public class AeroLinkService {
         "Fetching airport details for {} ICAO code(s): {}",
         normalizedCodes.size(),
         normalizedCodes);
-    return aviationDataProvider.fetchAirportsByIcaoCodes(normalizedCodes);
+    return aviationDataProviderRegistry
+        .getActiveProviderByName(activeProvider)
+        .fetchAirportsByIcaoCodes(normalizedCodes);
   }
 
   /**
