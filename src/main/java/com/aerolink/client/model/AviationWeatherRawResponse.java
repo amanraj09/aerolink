@@ -23,8 +23,6 @@ public record AviationWeatherRawResponse(
     String owner,
     String tower,
     String beacon,
-    String services,
-    String operations,
     String passengers,
     String freqs,
     List<RawRunway> runways) {

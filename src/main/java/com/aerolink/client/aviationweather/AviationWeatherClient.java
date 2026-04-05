@@ -13,6 +13,7 @@ import com.aerolink.model.response.AirportDetail;
 import com.aerolink.model.response.AirportIdentifier;
 import com.aerolink.model.response.AirportLocation;
 import com.aerolink.model.response.AirportOperations;
+import com.aerolink.model.response.AirportOwnership;
 import com.aerolink.model.response.RunwayDetail;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
@@ -226,11 +227,9 @@ public class AviationWeatherClient implements AviationDataProvider {
         new AirportLocation(
             response.state(), response.country(), response.lat(), response.lon(), response.elev()),
         new AirportOperations(
-            response.owner(),
-            response.tower(),
-            response.beacon(),
-            response.services(),
-            response.operations(),
+            AirportOwnership.fromCode(response.owner()),
+            response.tower() != null && !response.tower().isBlank(),
+            response.beacon() != null && !response.beacon().isBlank(),
             response.passengers()),
         new AirportCommunications(response.freqs(), response.magdec()),
         runways);

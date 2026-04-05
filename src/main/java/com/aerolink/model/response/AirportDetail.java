@@ -11,7 +11,7 @@ import java.util.List;
  * @param airportName Full official name of the airport (e.g. "KANSAS CITY/KANSAS CITY INTL")
  * @param identifier Codes used to identify the airport across different aviation systems
  * @param location Geographic details including coordinates and elevation
- * @param operations Operational attributes such as owner, tower, and services available
+ * @param operations Operational attributes such as owner and tower available
  * @param communications Radio frequencies and magnetic declination data
  * @param runways List of runways at the airport with physical and surface details
  */

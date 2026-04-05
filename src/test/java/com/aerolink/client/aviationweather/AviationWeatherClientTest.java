@@ -12,6 +12,7 @@ import com.aerolink.exception.AeroLinkException;
 import com.aerolink.exception.UpstreamServerException;
 import com.aerolink.model.error.ErrorCode;
 import com.aerolink.model.response.AirportDetail;
+import com.aerolink.model.response.AirportOwnership;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
@@ -176,12 +177,10 @@ class AviationWeatherClientTest {
               -73.7789,
               13,
               "14W",
-              "PU",
-              "Y",
-              "Y",
-              "Full",
-              "Civil",
-              "Y",
+              "P",
+              "T",
+              "B",
+              "1000000",
               "119.1",
               null);
       when(responseSpec.toEntity(any(ParameterizedTypeReference.class)))
@@ -199,6 +198,10 @@ class AviationWeatherClientTest {
       assertThat(result.location().longitude()).isEqualTo(-73.7789);
       assertThat(result.location().elevationFt()).isEqualTo(13);
       assertThat(result.communications().magneticDeclination()).isEqualTo("14W");
+      assertThat(result.operations().owner()).isEqualTo(AirportOwnership.PUBLIC);
+      assertThat(result.operations().isTowerAvailable()).isTrue();
+      assertThat(result.operations().isBeaconAvailable()).isTrue();
+      assertThat(result.operations().passengerCount()).isEqualTo("1000000");
       assertThat(result.runways()).isEmpty();
     }
 
@@ -237,8 +240,6 @@ class AviationWeatherClientTest {
               null,
               null,
               "Kennedy",
-              null,
-              null,
               null,
               null,
               null,
@@ -343,7 +344,7 @@ class AviationWeatherClientTest {
   private AviationWeatherRawResponse buildRawResponse(String icaoId, String name) {
     return new AviationWeatherRawResponse(
         icaoId, null, null, name, null, null, null, null, null, null, null, null, null, null, null,
-        null, null, null);
+        null);
   }
 
   private RetryTemplate buildRetryTemplate(int maxAttempts) {
