@@ -125,6 +125,4 @@ class CircuitBreakerIntegrationTest {
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
     assertThat(response.getBody()).contains("AERO-202");
   }
-
-
 }

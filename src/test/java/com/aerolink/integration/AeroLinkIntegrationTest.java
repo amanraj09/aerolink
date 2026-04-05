@@ -76,6 +76,4 @@ class AeroLinkIntegrationTest {
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     assertThat(response.getBody()).contains("AERO-102");
   }
-
-
 }
