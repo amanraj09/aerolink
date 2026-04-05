@@ -2,10 +2,8 @@ package com.aerolink.service;
 
 import com.aerolink.client.AviationDataProvider;
 import com.aerolink.config.AviationDataProviderRegistry;
-import com.aerolink.exception.AeroLinkException;
-import com.aerolink.metrics.AeroLinkMetrics;
+import com.aerolink.metrics.annotation.TrackMetrics;
 import com.aerolink.model.response.AirportDetail;
-import io.micrometer.core.instrument.Timer;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,15 +15,12 @@ import org.springframework.stereotype.Service;
 public class AeroLinkService {
 
   private final AviationDataProvider aviationDataProvider;
-  private final AeroLinkMetrics metrics;
 
   public AeroLinkService(
       AviationDataProviderRegistry aviationDataProviderRegistry,
-      @Value("${aerolink.provider}") String activeProvider,
-      AeroLinkMetrics metrics) {
+      @Value("${aerolink.provider}") String activeProvider) {
     this.aviationDataProvider =
         aviationDataProviderRegistry.getActiveProviderByName(activeProvider);
-    this.metrics = metrics;
   }
 
   /**
@@ -34,6 +29,7 @@ public class AeroLinkService {
    * @param icaoCodes list of ICAO airport identifiers (case-insensitive)
    * @return list of {@link AirportDetail} objects
    */
+  @TrackMetrics
   public List<AirportDetail> getAirportDetails(List<String> icaoCodes) {
     List<String> normalizedCodes = normalizeIcaoCodes(icaoCodes);
     log.info(
@@ -41,22 +37,7 @@ public class AeroLinkService {
         normalizedCodes.size(),
         normalizedCodes);
 
-    metrics.recordIcaoCodesRequested(normalizedCodes.size());
-    Timer.Sample sample = metrics.startLookupTimer();
-
-    try {
-      List<AirportDetail> results = aviationDataProvider.fetchAirportsByIcaoCodes(normalizedCodes);
-
-      String outcome = results.isEmpty() ? "empty" : "success";
-      metrics.recordLookupRequest(outcome);
-      metrics.recordAirportsReturned(results.size());
-      metrics.stopLookupTimer(sample, outcome);
-      return results;
-    } catch (AeroLinkException ex) {
-      metrics.recordLookupRequest("error");
-      metrics.stopLookupTimer(sample, "error");
-      throw ex;
-    }
+    return aviationDataProvider.fetchAirportsByIcaoCodes(normalizedCodes);
   }
 
   /**

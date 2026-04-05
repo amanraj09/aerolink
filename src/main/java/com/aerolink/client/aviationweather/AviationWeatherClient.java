@@ -6,7 +6,7 @@ import com.aerolink.constant.AeroLinkConstants;
 import com.aerolink.exception.AeroLinkException;
 import com.aerolink.exception.UpstreamServerException;
 import com.aerolink.exception.UpstreamTransientServerException;
-import com.aerolink.metrics.AeroLinkMetrics;
+import com.aerolink.metrics.annotation.TrackMetrics;
 import com.aerolink.model.error.ErrorCode;
 import com.aerolink.model.response.AirportCommunications;
 import com.aerolink.model.response.AirportDetail;
@@ -49,7 +49,6 @@ public class AviationWeatherClient implements AviationDataProvider {
   private final Bucket rateLimiterBucket;
   private final RetryTemplate retryTemplate;
   private final CircuitBreaker circuitBreaker;
-  private final AeroLinkMetrics metrics;
 
   @Autowired
   public AviationWeatherClient(
@@ -57,13 +56,11 @@ public class AviationWeatherClient implements AviationDataProvider {
       @Qualifier(AeroLinkConstants.PROVIDER_RATE_LIMITER) Bucket rateLimiterBucket,
       @Qualifier(AeroLinkConstants.PROVIDER_RETRY) RetryTemplate retryTemplate,
       @Qualifier(AeroLinkConstants.PROVIDER_CIRCUIT_BREAKER)
-          CircuitBreaker aviationWeatherCircuitBreaker,
-      AeroLinkMetrics metrics) {
+          CircuitBreaker aviationWeatherCircuitBreaker) {
     this.restClient = aviationWeatherRestClient;
     this.rateLimiterBucket = rateLimiterBucket;
     this.retryTemplate = retryTemplate;
     this.circuitBreaker = aviationWeatherCircuitBreaker;
-    this.metrics = metrics;
   }
 
   /**
@@ -73,6 +70,7 @@ public class AviationWeatherClient implements AviationDataProvider {
    * @return list of mapped {@link AirportDetail} objects
    */
   @Override
+  @TrackMetrics
   public List<AirportDetail> fetchAirportsByIcaoCodes(List<String> icaoCodes) {
     String ids = String.join(",", icaoCodes);
 
@@ -80,7 +78,6 @@ public class AviationWeatherClient implements AviationDataProvider {
     if (!probe.isConsumed()) {
       long retryAfterSeconds = probe.getNanosToWaitForRefill() / NANOS_PER_SECOND;
       log.warn("Aviation Weather API rate limit reached. Retry after {}s", retryAfterSeconds);
-      metrics.recordRateLimitHit();
       throw new AeroLinkException(ErrorCode.UPSTREAM_RATE_LIMIT_EXCEEDED, retryAfterSeconds);
     }
 

@@ -19,19 +19,6 @@ import org.springframework.stereotype.Component;
  * <p>All meters are pre-registered eagerly in the constructor so they appear in the Prometheus
  * scrape from app startup with value {@code 0}, rather than only after first use.
  *
- * <p>Metric catalogue:
- *
- * <ul>
- *   <li>{@code aerolink.airport.lookups} — Counter: total lookup requests by provider and outcome
- *   <li>{@code aerolink.airport.lookup.duration} — Timer: end-to-end lookup latency by provider and
- *       outcome
- *   <li>{@code aerolink.airport.lookup.icao.codes} — DistributionSummary: ICAO codes per request
- *   <li>{@code aerolink.airport.lookup.airports.returned} — DistributionSummary: airports returned
- *       per request
- *   <li>{@code aerolink.errors} — Counter: application errors by error code and type
- *   <li>{@code aerolink.upstream.rate.limit.hits} — Counter: upstream rate limit rejections by
- *       provider
- * </ul>
  */
 @Component
 public class AeroLinkMetrics {
@@ -45,8 +32,6 @@ public class AeroLinkMetrics {
 
   private static final List<String> OUTCOMES = List.of("success", "empty", "error");
 
-  // Pre-registered meters — keyed by "provider:outcome" for lookup/timer,
-  // by ErrorCode.getCode() for errors
   private final Map<String, Counter> lookupCounters;
   private final Map<String, Timer> lookupTimers;
   private final Map<String, Counter> errorCounters;

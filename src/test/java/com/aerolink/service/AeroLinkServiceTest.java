@@ -6,10 +6,8 @@ import static org.mockito.Mockito.when;
 
 import com.aerolink.client.AviationDataProvider;
 import com.aerolink.config.AviationDataProviderRegistry;
-import com.aerolink.metrics.AeroLinkMetrics;
 import com.aerolink.model.response.AirportDetail;
 import com.aerolink.model.response.AirportIdentifier;
-import io.micrometer.core.instrument.Timer;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -25,7 +23,6 @@ class AeroLinkServiceTest {
 
   @Mock private AviationDataProviderRegistry aviationDataProviderRegistry;
   @Mock private AviationDataProvider aviationDataProvider;
-  @Mock private AeroLinkMetrics metrics;
 
   private AeroLinkService aeroLinkService;
 
@@ -33,8 +30,7 @@ class AeroLinkServiceTest {
   void setUp() {
     when(aviationDataProviderRegistry.getActiveProviderByName(ACTIVE_PROVIDER))
         .thenReturn(aviationDataProvider);
-    when(metrics.startLookupTimer()).thenReturn(Timer.start());
-    aeroLinkService = new AeroLinkService(aviationDataProviderRegistry, ACTIVE_PROVIDER, metrics);
+    aeroLinkService = new AeroLinkService(aviationDataProviderRegistry, ACTIVE_PROVIDER);
   }
 
   // ─────────────────────────────────────────────

@@ -29,9 +29,6 @@ public class AeroLinkController {
    * Retrieves airport details for one or more ICAO codes. Maximum of 15 ICAO codes allowed per
    * request.
    *
-   * <p>Validation performed by {@link RequestValidator}: - At least 1 ICAO code required - Each
-   * code must be exactly 4 uppercase letters (e.g., KJFK, LFPG) - Maximum 15 codes per request
-   *
    * @param icaoCodes list of 4-letter ICAO airport identifiers (max 15)
    * @return 200 with list of {@link AirportDetail}
    */

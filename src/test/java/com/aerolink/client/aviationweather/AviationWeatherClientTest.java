@@ -10,7 +10,6 @@ import com.aerolink.client.model.AviationWeatherRawResponse;
 import com.aerolink.client.model.AviationWeatherRawResponse.RawRunway;
 import com.aerolink.exception.AeroLinkException;
 import com.aerolink.exception.UpstreamServerException;
-import com.aerolink.metrics.AeroLinkMetrics;
 import com.aerolink.model.error.ErrorCode;
 import com.aerolink.model.response.AirportDetail;
 import io.github.bucket4j.Bucket;
@@ -44,7 +43,6 @@ class AviationWeatherClientTest {
   @Mock private RestClient.ResponseSpec responseSpec;
   @Mock private Bucket bucket;
   @Mock private ConsumptionProbe consumptionProbe;
-  @Mock private AeroLinkMetrics metrics;
 
   private CircuitBreaker circuitBreaker;
   private RetryTemplate noRetryTemplate;
@@ -54,8 +52,7 @@ class AviationWeatherClientTest {
   void setUp() {
     circuitBreaker = CircuitBreaker.of("test", CircuitBreakerConfig.ofDefaults());
     noRetryTemplate = buildRetryTemplate(1);
-    client =
-        new AviationWeatherClient(restClient, bucket, noRetryTemplate, circuitBreaker, metrics);
+    client = new AviationWeatherClient(restClient, bucket, noRetryTemplate, circuitBreaker);
 
     lenient().when(restClient.get()).thenReturn(uriSpec);
     lenient().when(uriSpec.uri(any(Function.class))).thenReturn(headersSpec);
