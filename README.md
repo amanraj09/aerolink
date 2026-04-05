@@ -203,7 +203,7 @@ curl http://localhost:8081/prometheus
 
 Parts of this project were developed with the help of **Claude (Anthropic)** as an AI pair programmer. AI assistance was used for:
 
-- **Unit test generation** — test cases for the client, service, and controller layers including edge cases and error scenarios
+- **Unit test generation** — test cases for the client, service, and controller layers
 - **Integration test generation** — WireMock-based circuit breaker integration tests covering 4xx, 5xx, and open circuit scenarios
 - **Configuration boilerplate** — setting up `RestClient`, `RetryTemplate`, `CircuitBreaker`, and Bucket4j with connection pooling and metrics binding
 - **README documentation** — Adding build, setup and run steps, API documentation
