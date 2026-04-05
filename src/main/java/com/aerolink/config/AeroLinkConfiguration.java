@@ -1,7 +1,5 @@
 package com.aerolink.config;
 
-import com.aerolink.client.AviationDataProvider;
-import com.aerolink.client.aviationweather.AviationWeatherClient;
 import com.aerolink.constant.AeroLinkConstants;
 import com.aerolink.exception.AeroLinkException;
 import com.aerolink.properties.AviationProviderProperties;
@@ -121,16 +119,5 @@ public class AeroLinkConfiguration {
             .build();
 
     return Bucket.builder().addLimit(limit).build();
-  }
-
-  // ─── Client ───────────────────────────────────────────────────────────────
-
-  @Bean
-  public AviationDataProvider aviationWeatherClient(
-      RestClient restClient,
-      Bucket rateLimiterBucket,
-      RetryTemplate retryTemplate,
-      CircuitBreaker circuitBreaker) {
-    return new AviationWeatherClient(restClient, rateLimiterBucket, retryTemplate, circuitBreaker);
   }
 }

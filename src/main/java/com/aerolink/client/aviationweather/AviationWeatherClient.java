@@ -2,6 +2,7 @@ package com.aerolink.client.aviationweather;
 
 import com.aerolink.client.AviationDataProvider;
 import com.aerolink.client.model.AviationWeatherRawResponse;
+import com.aerolink.constant.AeroLinkConstants;
 import com.aerolink.exception.AeroLinkException;
 import com.aerolink.model.error.ErrorCode;
 import com.aerolink.model.response.AirportCommunications;
@@ -16,10 +17,13 @@ import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.retry.support.RetryTemplate;
+import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
@@ -30,6 +34,7 @@ import org.springframework.web.client.RestClientException;
  * RestClient-based implementation of {@link AviationDataProvider} for public Aviation Weather API.
  */
 @Slf4j
+@Component
 public class AviationWeatherClient implements AviationDataProvider {
 
   private final String AIRPORT_PATH = "/airport";
@@ -40,11 +45,13 @@ public class AviationWeatherClient implements AviationDataProvider {
   private final RetryTemplate retryTemplate;
   private final CircuitBreaker circuitBreaker;
 
+  @Autowired
   public AviationWeatherClient(
-      RestClient aviationWeatherRestClient,
-      Bucket rateLimiterBucket,
-      RetryTemplate retryTemplate,
-      CircuitBreaker aviationWeatherCircuitBreaker) {
+      @Qualifier(AeroLinkConstants.PROVIDER_REST_CLIENT) RestClient aviationWeatherRestClient,
+      @Qualifier(AeroLinkConstants.PROVIDER_RATE_LIMITER) Bucket rateLimiterBucket,
+      @Qualifier(AeroLinkConstants.PROVIDER_RETRY) RetryTemplate retryTemplate,
+      @Qualifier(AeroLinkConstants.PROVIDER_CIRCUIT_BREAKER)
+          CircuitBreaker aviationWeatherCircuitBreaker) {
     this.restClient = aviationWeatherRestClient;
     this.rateLimiterBucket = rateLimiterBucket;
     this.retryTemplate = retryTemplate;
