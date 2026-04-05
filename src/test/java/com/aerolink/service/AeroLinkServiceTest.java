@@ -5,9 +5,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.aerolink.client.AviationDataProvider;
+import com.aerolink.config.AviationDataProviderRegistry;
 import com.aerolink.model.response.AirportDetail;
 import com.aerolink.model.response.AirportIdentifier;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -15,13 +17,24 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class AeroLinkServiceTest {
 
+  private static final String ACTIVE_PROVIDER = "aviationWeather";
+
+  @Mock private AviationDataProviderRegistry aviationDataProviderRegistry;
   @Mock private AviationDataProvider aviationDataProvider;
 
   @InjectMocks private AeroLinkService aeroLinkService;
+
+  @BeforeEach
+  void setUp() {
+    ReflectionTestUtils.setField(aeroLinkService, "activeProvider", ACTIVE_PROVIDER);
+    when(aviationDataProviderRegistry.getActiveProviderByName(ACTIVE_PROVIDER))
+        .thenReturn(aviationDataProvider);
+  }
 
   // ─────────────────────────────────────────────
   // ICAO code normalization
