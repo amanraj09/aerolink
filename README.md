@@ -93,10 +93,6 @@ Every upstream call passes through three layers of protection in order: `Rate Li
 
 - **Provider abstraction** — `AviationDataProvider` is an interface even though only one implementation exists today. The active provider is resolved at startup from `aerolink.provider` config via `AviationDataProviderRegistry`. Adding a second provider (e.g. FlightAware) requires only a new `@Component` implementing the interface and a config change — no business logic changes.
 
-- **500 is not retried** — A 500 indicates a server-side bug. Retrying the identical request against the same endpoint will produce the same result. Only transient conditions (502, 503, network failures) are retried.
-
-- **Circuit breaker ignores business exceptions** — Validation errors (bad ICAO format, too many codes) and rate limit hits are application-level outcomes, not upstream instability signals. Including them in the failure rate would cause the circuit to open under legitimate client-side load.
-
 - **Separate management port (8081)** — Prometheus, health, and info endpoints are internal operational tooling. Binding them to a dedicated port allows them to be firewalled at the infrastructure level without any application-level authentication logic.
 
 - **Resilience at the client layer, not the service layer** — Retry and Circuit Breaker live inside `AviationWeatherClient`, not `AeroLinkService`. Resilience is a transport concern — it deals with HTTP status codes, network failures, and upstream behaviour that the service layer has no business knowing about. Placing it at the client boundary keeps business logic clean and makes resilience behaviour easy to reason about and test in isolation.
@@ -196,3 +192,16 @@ curl "http://localhost:8080/api/v1/airport?icaoCodes=KLAX,KSFO"
 > [!IMPORTANT]
 > **Why are `/status`, `/info`, and `/prometheus` on port 8081 instead of 8080?**
 > These endpoints must never be reachable by end users or the public internet. Exposing Prometheus metrics leaks internal implementation details (method names, dependency versions, error rates), while health and info endpoints can reveal infrastructure topology. Running them on a separate port lets us block port 8081 entirely at the network/infrastructure level (firewall, security group, ingress rule).
+
+---
+
+## 🤖 AI Assistance
+
+Parts of this project were developed with the help of **Claude (Anthropic)** as an AI pair programmer. AI assistance was used for:
+
+- **Unit test generation** — test cases for the client, service, and controller layers including edge cases and error scenarios
+- **Integration test generation** — WireMock-based circuit breaker integration tests covering 4xx, 5xx, and open circuit scenarios
+- **Configuration boilerplate** — setting up `RestClient`, `RetryTemplate`, `CircuitBreaker`, and Bucket4j with connection pooling and metrics binding
+- **README documentation** — architecture overview, design decisions, and API documentation
+
+All AI-generated code was reviewed, validated, and intentionally integrated. Core application logic, resilience design decisions, and architecture were human-driven.
