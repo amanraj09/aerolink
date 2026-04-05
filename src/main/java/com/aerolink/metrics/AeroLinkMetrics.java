@@ -18,7 +18,6 @@ import org.springframework.stereotype.Component;
  *
  * <p>All meters are pre-registered eagerly in the constructor so they appear in the Prometheus
  * scrape from app startup with value {@code 0}, rather than only after first use.
- *
  */
 @Component
 public class AeroLinkMetrics {
