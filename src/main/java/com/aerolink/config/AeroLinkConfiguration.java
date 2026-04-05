@@ -6,6 +6,11 @@ import com.aerolink.properties.AviationProviderProperties;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.micrometer.tagged.TaggedCircuitBreakerMetrics;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.observation.ObservationRegistry;
 import java.time.Duration;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -34,11 +39,13 @@ public class AeroLinkConfiguration {
   // ─── RestClient ───────────────────────────────────────────────────────────
 
   @Bean(name = AeroLinkConstants.PROVIDER_REST_CLIENT)
-  public RestClient restClient(AviationProviderProperties properties) {
+  public RestClient restClient(
+      AviationProviderProperties properties, ObservationRegistry observationRegistry) {
     return RestClient.builder()
         .baseUrl(properties.baseUrl())
         .requestFactory(buildRequestFactory(properties))
         .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+        .observationRegistry(observationRegistry)
         .build();
   }
 
@@ -92,7 +99,7 @@ public class AeroLinkConfiguration {
   private static final int HALF_OPEN_PERMITTED_CALLS = 3;
 
   @Bean(name = AeroLinkConstants.PROVIDER_CIRCUIT_BREAKER)
-  public CircuitBreaker circuitBreaker() {
+  public CircuitBreaker circuitBreaker(MeterRegistry meterRegistry) {
     io.github.resilience4j.circuitbreaker.CircuitBreakerConfig config =
         io.github.resilience4j.circuitbreaker.CircuitBreakerConfig.custom()
             .slidingWindowSize(SLIDING_WINDOW_SIZE)
@@ -103,17 +110,26 @@ public class AeroLinkConfiguration {
             .ignoreExceptions(AeroLinkException.class)
             .build();
 
-    return CircuitBreaker.of("aviationWeather", config);
+    CircuitBreakerRegistry registry = CircuitBreakerRegistry.of(config);
+    TaggedCircuitBreakerMetrics.ofCircuitBreakerRegistry(registry).bindTo(meterRegistry);
+    return registry.circuitBreaker("aviationWeather");
   }
 
   @Bean(name = AeroLinkConstants.PROVIDER_RATE_LIMITER)
-  public Bucket rateLimiterBucket(AviationProviderProperties properties) {
+  public Bucket rateLimiterBucket(AviationProviderProperties properties, MeterRegistry meterRegistry) {
     Bandwidth limit =
         Bandwidth.builder()
             .capacity(properties.requestLimitPerMinute())
             .refillGreedy(properties.requestLimitPerMinute(), Duration.ofMinutes(1))
             .build();
 
-    return Bucket.builder().addLimit(limit).build();
+    Bucket bucket = Bucket.builder().addLimit(limit).build();
+
+    Gauge.builder("aerolink.rate.limiter.available.tokens", bucket, b -> b.getAvailableTokens())
+        .description("Number of available tokens in the aviation provider rate limiter bucket")
+        .tag("provider", "aviationWeather")
+        .register(meterRegistry);
+
+    return bucket;
   }
 }
