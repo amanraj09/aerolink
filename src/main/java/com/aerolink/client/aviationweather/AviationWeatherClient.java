@@ -15,6 +15,7 @@ import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import java.io.IOException;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +23,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
@@ -98,22 +100,14 @@ public class AviationWeatherClient implements AviationDataProvider {
                                         .build())
                             .retrieve()
                             .onStatus(
+                                status -> status.value() == 429,
+                                (request, apiResponse) -> handle429RateLimit(ids, apiResponse))
+                            .onStatus(
                                 HttpStatusCode::is4xxClientError,
-                                (request, apiResponse) -> {
-                                  log.error(
-                                      "Aviation Weather API returned HTTP {} for IDs: {} — will not retry",
-                                      apiResponse.getStatusCode().value(),
-                                      ids);
-                                  throw new AeroLinkException(ErrorCode.UPSTREAM_CLIENT_ERROR);
-                                })
+                                (request, apiResponse) -> handle4xxClientError(ids, apiResponse))
                             .onStatus(
                                 status -> status.value() == 500,
-                                (request, apiResponse) -> {
-                                  log.error(
-                                      "Aviation Weather API returned HTTP 500 for IDs: {} — will not retry",
-                                      ids);
-                                  throw new AeroLinkException(ErrorCode.UPSTREAM_SERVER_ERROR);
-                                })
+                                (request, apiResponse) -> handle500ServerError(ids, apiResponse))
                             .toEntity(new ParameterizedTypeReference<>() {});
 
                     HttpStatusCode statusCode = response.getStatusCode();
@@ -171,6 +165,33 @@ public class AviationWeatherClient implements AviationDataProvider {
     }
     log.error("Upstream communication error for IDs: {} — {}", ids, ex.getMessage());
     return new AeroLinkException(ErrorCode.UPSTREAM_RESPONSE_PARSE_ERROR);
+  }
+
+  private void handle429RateLimit(String ids, ClientHttpResponse response) throws IOException {
+    log.error("Aviation Weather API returned HTTP 429 for IDs: {} — rate limited", ids);
+    String retryAfter = response.getHeaders().getFirst("Retry-After");
+    Long retrySeconds = null;
+    if (retryAfter != null) {
+      try {
+        retrySeconds = Long.parseLong(retryAfter);
+      } catch (NumberFormatException ex) {
+        log.error("Could not compute retrySeconds. Error is : ", ex);
+      }
+    }
+    throw new AeroLinkException(ErrorCode.UPSTREAM_RATE_LIMIT_EXCEEDED, retrySeconds);
+  }
+
+  private void handle4xxClientError(String ids, ClientHttpResponse response) throws IOException {
+    log.error(
+        "Aviation Weather API returned HTTP {} for IDs: {} — will not retry",
+        response.getStatusCode().value(),
+        ids);
+    throw new AeroLinkException(ErrorCode.UPSTREAM_CLIENT_ERROR);
+  }
+
+  private void handle500ServerError(String ids, ClientHttpResponse response) {
+    log.error("Aviation Weather API returned HTTP 500 for IDs: {} — will not retry", ids);
+    throw new AeroLinkException(ErrorCode.UPSTREAM_SERVER_ERROR);
   }
 
   /**

@@ -106,16 +106,12 @@ public class AeroLinkConfiguration {
     return CircuitBreaker.of("aviationWeather", config);
   }
 
-  // ─── Rate Limiter ─────────────────────────────────────────────────────────
-
-  private static final int TOKEN_REFILL_RATE = 1;
-
   @Bean(name = AeroLinkConstants.PROVIDER_RATE_LIMITER)
   public Bucket rateLimiterBucket(AviationProviderProperties properties) {
     Bandwidth limit =
         Bandwidth.builder()
             .capacity(properties.requestLimitPerMinute())
-            .refillGreedy(TOKEN_REFILL_RATE, Duration.ofSeconds(1))
+            .refillGreedy(properties.requestLimitPerMinute(), Duration.ofMinutes(1))
             .build();
 
     return Bucket.builder().addLimit(limit).build();
