@@ -9,10 +9,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
- * Service layer containing business logic for retrieving and transforming airport data.
+ * Service layer containing business logic for retrieving and transforming
+ * airport data.
  *
- * <p>Acts as the intermediary between the controller and the external aviation data provider.
- * Delegates the upstream API call to {@link AviationDataProvider}, keeping the service decoupled
+ * <p>
+ * Acts as the intermediary between the controller and the external aviation
+ * data provider.
+ * Delegates the upstream API call to {@link AviationDataProvider}, keeping the
+ * service decoupled
  * from any specific provider implementation.
  */
 @Slf4j
@@ -46,7 +50,8 @@ public class AeroLinkService {
   }
 
   /**
-   * Normalizes ICAO codes to uppercase. Ensures consistent format before passing to the upstream
+   * Normalizes ICAO codes to uppercase. Ensures consistent format before passing
+   * to the upstream
    * API,
    *
    * @param icaoCodes raw ICAO codes from the request
